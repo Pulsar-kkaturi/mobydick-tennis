@@ -20,6 +20,12 @@ tid = tournament["id"]
 
 st.caption(f"설정은 **{selected_name}** 대회에만 적용됩니다.")
 
+# 완료/승인된 대회는 수정 잠금
+is_locked = tournament.get("is_finished") or tournament.get("is_approved")
+if is_locked:
+    lock_reason = "승인된" if tournament.get("is_approved") else "완료 처리된"
+    st.warning(f"🔒 {lock_reason} 대회입니다. 설정을 변경할 수 없습니다.")
+
 tab_assign, tab_score = st.tabs(["선수 배정", "점수 설정"])
 
 
@@ -68,10 +74,14 @@ with tab_assign:
                 with col4:
                     st.caption("🃏 WC" if p["is_wildcard"] else "")
                 with col5:
-                    if st.button("수정", key=f"edit_tp_{p['id']}"):
+                    if is_locked:
+                        st.button("수정", key=f"edit_tp_{p['id']}", disabled=True)
+                    elif st.button("수정", key=f"edit_tp_{p['id']}"):
                         st.session_state["editing_tp"] = p
                 with col6:
-                    if st.button("제거", key=f"rem_tp_{p['id']}"):
+                    if is_locked:
+                        st.button("제거", key=f"rem_tp_{p['id']}", disabled=True)
+                    elif st.button("제거", key=f"rem_tp_{p['id']}"):
                         db.remove_player_from_tournament(p["id"])
                         st.session_state.pop("editing_tp", None)
                         st.rerun()
@@ -81,7 +91,7 @@ with tab_assign:
         st.info("아직 배정된 선수가 없습니다.")
 
     editing_tp = st.session_state.get("editing_tp")   # 위에서 이미 선언됨
-    if editing_tp:
+    if editing_tp and not is_locked:
         st.divider()
         st.markdown(f"**{editing_tp['name']}** 배정 수정 (성별·스타일은 선수관리에서 변경)")
         with st.form("edit_tp_form"):
@@ -100,29 +110,32 @@ with tab_assign:
 
     st.divider()
 
-    st.markdown("**선수 풀에서 배정 추가**")
-    all_players = db.get_all_players()
-    available = [p for p in all_players if p["id"] not in assigned_player_ids]
-
-    if not available:
-        st.info("전체 풀의 모든 선수가 이미 배정되어 있습니다.")
+    if is_locked:
+        st.info("완료 또는 승인된 대회는 선수를 추가할 수 없습니다.")
     else:
-        with st.form("assign_player_form", clear_on_submit=True):
-            selected_players = st.multiselect(
-                "추가할 선수 선택",
-                options=[p["name"] for p in available],
-            )
-            wc_input = st.checkbox("와일드카드")
+        st.markdown("**선수 풀에서 배정 추가**")
+        all_players = db.get_all_players()
+        available = [p for p in all_players if p["id"] not in assigned_player_ids]
 
-            if st.form_submit_button("배정"):
-                if not selected_players:
-                    st.error("선수를 1명 이상 선택해 주세요.")
-                else:
-                    name_to_id = {p["name"]: p["id"] for p in available}
-                    for name in selected_players:
-                        db.add_player_to_tournament(tid, name_to_id[name], wc_input)
-                    st.success(f"{len(selected_players)}명 배정 완료!")
-                    st.rerun()
+        if not available:
+            st.info("전체 풀의 모든 선수가 이미 배정되어 있습니다.")
+        else:
+            with st.form("assign_player_form", clear_on_submit=True):
+                selected_players = st.multiselect(
+                    "추가할 선수 선택",
+                    options=[p["name"] for p in available],
+                )
+                wc_input = st.checkbox("와일드카드")
+
+                if st.form_submit_button("배정"):
+                    if not selected_players:
+                        st.error("선수를 1명 이상 선택해 주세요.")
+                    else:
+                        name_to_id = {p["name"]: p["id"] for p in available}
+                        for name in selected_players:
+                            db.add_player_to_tournament(tid, name_to_id[name], wc_input)
+                        st.success(f"{len(selected_players)}명 배정 완료!")
+                        st.rerun()
 
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -157,7 +170,10 @@ with tab_score:
     selected_preset = st.selectbox("프리셋 선택", ["(직접 설정)"] + preset_names, key="preset_pick")
 
     if selected_preset != "(직접 설정)":
-        if st.button(f"'{selected_preset}' 프리셋 적용", key="apply_preset_btn"):
+        if is_locked:
+            st.button(f"'{selected_preset}' 프리셋 적용", key="apply_preset_btn", disabled=True,
+                      help="완료 또는 승인된 대회는 설정을 변경할 수 없습니다.")
+        elif st.button(f"'{selected_preset}' 프리셋 적용", key="apply_preset_btn"):
             preset_values = apply_preset(selected_preset)
             for key, (is_active, score_value) in preset_values.items():
                 if key in config:
@@ -199,7 +215,9 @@ with tab_score:
                 )
             new_values[key] = (is_active, score_value, row["id"])
 
-        if st.form_submit_button("설정 저장"):
+        submitted = st.form_submit_button("설정 저장", disabled=is_locked,
+                                          help="완료 또는 승인된 대회는 설정을 변경할 수 없습니다." if is_locked else None)
+        if submitted:
             for key, (is_active, score_value, config_id) in new_values.items():
                 db.update_scoring_config(config_id, is_active, score_value)
             st.success("점수 설정을 저장했습니다.")

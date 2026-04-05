@@ -49,7 +49,16 @@ create trigger on_auth_user_created
   for each row execute function public.handle_new_user();
 
 -- 3) scoring_config: win_bonus → win_score 키 이름 통일
---    레거시 데이터의 item_key를 win_score 로 일괄 변경
+--    이미 win_score 가 존재하는 대회는 win_bonus 행을 삭제 (중복 방지)
+delete from scoring_config
+where item_key = 'win_bonus'
+  and exists (
+    select 1 from scoring_config sc2
+    where sc2.tournament_id = scoring_config.tournament_id
+      and sc2.item_key = 'win_score'
+  );
+
+--    win_score 가 없는 대회의 win_bonus 만 이름 변경
 update scoring_config
 set item_key = 'win_score', label = '승리'
 where item_key = 'win_bonus';

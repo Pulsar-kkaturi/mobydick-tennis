@@ -20,6 +20,12 @@ if tournament.get("is_legacy"):
     st.info("레거시 대회는 경기 입력이 없습니다. 순위표 페이지에서 1~3위를 직접 기록해 주세요.")
     st.stop()
 
+# 완료/승인된 대회는 수정 잠금
+is_locked = tournament.get("is_finished") or tournament.get("is_approved")
+if is_locked:
+    lock_reason = "승인된" if tournament.get("is_approved") else "완료 처리된"
+    st.warning(f"🔒 {lock_reason} 대회입니다. 경기 결과를 입력하거나 수정할 수 없습니다.")
+
 # ── 경기 목록 ─────────────────────────────────────────────────────────────────
 matches = db.get_matches(tid)
 if not matches:
@@ -66,7 +72,10 @@ for m in filtered:
                 label_visibility="collapsed",
             )
         with col3:
-            if st.button("저장", key=f"save_{m['id']}"):
+            if is_locked:
+                st.button("저장", key=f"save_{m['id']}", disabled=True,
+                          help="완료 또는 승인된 대회는 점수를 수정할 수 없습니다.")
+            elif st.button("저장", key=f"save_{m['id']}"):
                 db.upsert_match(tid, {
                     "team1_score": s1,
                     "team2_score": s2,
@@ -80,7 +89,7 @@ for m in filtered:
 
 # ── 추가 점수 입력 ────────────────────────────────────────────────────────────
 st.divider()
-with st.expander("추가 점수 입력 (토너먼트 보너스 등)"):
+with st.expander("추가 점수 입력 (토너먼트 보너스 등)", disabled=is_locked):
     players = db.get_tournament_players(tid)
     extra_scores = db.get_extra_scores(tid)
     extra_map = {e["player_name"]: e for e in extra_scores}

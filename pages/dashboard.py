@@ -110,7 +110,12 @@ with col_main:
                 with st.container(border=True):
                     c1, c2, c3, c4 = st.columns([4, 2, 1, 1])
                     with c1:
-                        status = "✅ 완료" if t["is_finished"] else "🔄 진행 중"
+                        if t.get("is_approved"):
+                            status = "🏆 승인"
+                        elif t["is_finished"]:
+                            status = "✅ 완료"
+                        else:
+                            status = "🔄 진행 중"
                         legacy_badge = " &nbsp; `레거시`" if t.get("is_legacy") else ""
                         st.markdown(f"**{t['name']}** &nbsp; {status}{legacy_badge}")
                         if t.get("date"):
@@ -128,9 +133,14 @@ with col_main:
                     with c3:
                         if logged_in:
                             label = "완료 취소" if t["is_finished"] else "완료 처리"
-                            if st.button(label, key=f"finish_{t['id']}"):
-                                db.finish_tournament(t["id"], not t["is_finished"])
-                                st.rerun()
+                            if t.get("is_approved"):
+                                # 승인된 대회는 완료 처리/취소 모두 불가
+                                st.button(label, key=f"finish_{t['id']}", disabled=True,
+                                          help="승인된 대회는 수정할 수 없습니다. 운영 → 대회 승인에서 승인을 취소한 뒤 변경해 주세요.")
+                            else:
+                                if st.button(label, key=f"finish_{t['id']}"):
+                                    db.finish_tournament(t["id"], not t["is_finished"])
+                                    st.rerun()
                     with c4:
                         if logged_in:
                             if t.get("is_approved"):
