@@ -1,0 +1,13 @@
+# Supabase 키 - 절대 GitHub에 올리면 안 됨
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# DB 파일 (로컬 SQLite 잔재물)
+*.db
+
+# 에디터
+.DS_Store
