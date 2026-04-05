@@ -44,9 +44,12 @@ with st.sidebar:
             tab_login, tab_signup = st.tabs(["로그인", "회원가입"])
 
             with tab_login:
-                email = st.text_input("이메일", key="login_email")
-                password = st.text_input("비밀번호", type="password", key="login_pw")
-                if st.button("로그인", use_container_width=True, key="btn_login"):
+                # st.form: 비밀번호 칸에서 Enter 누르면 로그인 버튼과 동일하게 제출됨
+                with st.form("sidebar_login_form", border=False):
+                    email = st.text_input("이메일", key="login_email")
+                    password = st.text_input("비밀번호", type="password", key="login_pw")
+                    login_submitted = st.form_submit_button("로그인", use_container_width=True)
+                if login_submitted:
                     if auth.login(email, password):
                         st.rerun()
                     else:
@@ -54,8 +57,10 @@ with st.sidebar:
 
                 with st.expander("비밀번호를 잊으셨나요?", expanded=False):
                     st.caption("가입 시 사용한 이메일로 재설정 링크를 보냅니다.")
-                    re_email = st.text_input("이메일", key="reset_pw_email")
-                    if st.button("재설정 메일 보내기", key="btn_reset_pw"):
+                    with st.form("sidebar_reset_pw_form", border=False):
+                        re_email = st.text_input("이메일", key="reset_pw_email")
+                        reset_submitted = st.form_submit_button("재설정 메일 보내기")
+                    if reset_submitted:
                         ok_r, msg_r = auth.send_password_reset_email(re_email)
                         if ok_r:
                             st.success(msg_r)
@@ -64,19 +69,21 @@ with st.sidebar:
 
             with tab_signup:
                 st.caption("영문+숫자 조합 8자 이상 비밀번호")
-                su_name = st.text_input("이름", key="su_name")
-                su_email = st.text_input("이메일 (로그인 ID)", key="su_email")
-                su_pw = st.text_input("비밀번호", type="password", key="su_pw")
-                su_pw2 = st.text_input("비밀번호 확인", type="password", key="su_pw2")
-                su_birth = st.date_input(
-                    "생년월일",
-                    min_value=datetime.date(1920, 1, 1),
-                    max_value=datetime.date.today(),
-                    value=None,
-                    key="su_birth",
-                )
+                with st.form("sidebar_signup_form", border=False):
+                    su_name = st.text_input("이름", key="su_name")
+                    su_email = st.text_input("이메일 (로그인 ID)", key="su_email")
+                    su_pw = st.text_input("비밀번호", type="password", key="su_pw")
+                    su_pw2 = st.text_input("비밀번호 확인", type="password", key="su_pw2")
+                    su_birth = st.date_input(
+                        "생년월일",
+                        min_value=datetime.date(1920, 1, 1),
+                        max_value=datetime.date.today(),
+                        value=None,
+                        key="su_birth",
+                    )
+                    signup_submitted = st.form_submit_button("회원가입", use_container_width=True)
 
-                if st.button("회원가입", use_container_width=True, key="btn_signup"):
+                if signup_submitted:
                     if su_pw != su_pw2:
                         st.error("비밀번호 확인이 일치하지 않습니다.")
                     else:
