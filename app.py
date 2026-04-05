@@ -1,6 +1,6 @@
 """
 모비딕 테니스 - 메인 홈 화면
-- 시즌 전체 랭킹 (대회 선택 가능)
+- 시즌 전체 랭킹 (연도 필터)
 - 대회 생성 / 관리
 """
 import streamlit as st
@@ -26,36 +26,50 @@ st.header("시즌 전체 랭킹")
 if not tournaments:
     st.info("아직 대회가 없습니다. 아래에서 첫 번째 대회를 만들어 보세요!")
 else:
-    # 멀티셀렉트로 포함할 대회 선택
-    t_names = [t["name"] for t in tournaments]
-    selected_for_ranking = st.multiselect(
-        "랭킹 산정에 포함할 대회 선택",
-        options=t_names,
-        default=t_names,  # 기본값: 전체 선택
-    )
+    def get_year(t):
+        """대회 날짜에서 연도 추출. 날짜 없으면 '날짜 미설정' 반환."""
+        if t.get("date"):
+            return str(t["date"])[:4]
+        return "날짜 미설정"
 
-    selected_tournaments = [t for t in tournaments if t["name"] in selected_for_ranking]
+    years = sorted({get_year(t) for t in tournaments}, reverse=True)
+    selected_year = st.selectbox("연도 선택", ["전체"] + years, index=0)
+
+    if selected_year == "전체":
+        selected_tournaments = tournaments
+    else:
+        selected_tournaments = [t for t in tournaments if get_year(t) == selected_year]
 
     if not selected_tournaments:
-        st.warning("대회를 1개 이상 선택해 주세요.")
+        st.info(f"{selected_year}년에 해당하는 대회가 없습니다.")
     else:
-        # 선택된 대회들의 순위표 계산
+        # 각 대회의 순위표 계산
+        # - 일반 대회: 경기 결과로 계산
+        # - 레거시 대회: 수동 입력한 1~3위 사용
         standings_map = {}
         for t in selected_tournaments:
             tid = t["id"]
-            players = db.get_players(tid)
-            matches = db.get_matches(tid)
-            config = db.get_scoring_config(tid)
-            extra_scores = db.get_extra_scores(tid)
-            if players:
-                standings_map[tid] = calculate_standings(players, matches, config, extra_scores)
+            if t.get("is_legacy"):
+                # 레거시: legacy_results 테이블에서 가져와 standings 형식으로 변환
+                legacy = db.get_legacy_results(tid)
+                RANK_POINTS = {1: 3, 2: 2, 3: 1}
+                standings_map[tid] = [
+                    {"name": r["player_name"], "rank": r["rank"]}
+                    for r in legacy if r["rank"] in RANK_POINTS
+                ]
+            else:
+                players = db.get_tournament_players(tid)
+                matches = db.get_matches(tid)
+                config = db.get_scoring_config(tid)
+                extra_scores = db.get_extra_scores(tid)
+                if players:
+                    standings_map[tid] = calculate_standings(players, matches, config, extra_scores)
 
         season_ranking = get_season_ranking(selected_tournaments, standings_map)
 
         if not season_ranking:
             st.info("아직 순위 포인트를 얻은 선수가 없습니다. (1~3위를 달성해야 포인트 부여)")
         else:
-            # 시즌 랭킹 표
             rows = []
             for i, r in enumerate(season_ranking):
                 detail_str = " | ".join(
@@ -98,18 +112,22 @@ with col_main:
                 c1, c2, c3, c4 = st.columns([4, 2, 1, 1])
                 with c1:
                     status = "✅ 완료" if t["is_finished"] else "🔄 진행 중"
-                    st.markdown(f"**{t['name']}** &nbsp; {status}")
+                    legacy_badge = " &nbsp; `레거시`" if t.get("is_legacy") else ""
+                    st.markdown(f"**{t['name']}** &nbsp; {status}{legacy_badge}")
                     if t.get("date"):
                         st.caption(f"날짜: {t['date']}")
                     if t.get("description"):
                         st.caption(t["description"])
                 with c2:
-                    # 선수 수 / 경기 수 표시
-                    players_count = len(db.get_players(t["id"]))
-                    matches_count = len(db.get_matches(t["id"]))
-                    st.caption(f"선수 {players_count}명 / 경기 {matches_count}개")
+                    if t.get("is_legacy"):
+                        # 레거시 대회는 기록된 순위 수 표시
+                        results = db.get_legacy_results(t["id"])
+                        st.caption(f"순위 기록: {len(results)}/3")
+                    else:
+                        players_count = len(db.get_tournament_players(t["id"]))
+                        matches_count = len(db.get_matches(t["id"]))
+                        st.caption(f"선수 {players_count}명 / 경기 {matches_count}개")
                 with c3:
-                    # 완료 토글
                     label = "완료 취소" if t["is_finished"] else "완료 처리"
                     if st.button(label, key=f"finish_{t['id']}"):
                         db.finish_tournament(t["id"], not t["is_finished"])
@@ -128,12 +146,16 @@ with col_form:
     with st.form("create_tournament", clear_on_submit=True):
         name = st.text_input("대회 이름", placeholder="예: 2026 상반기 리그")
         date = st.date_input("대회 날짜 (선택)")
-        desc = st.text_area("메모 (선택)", height=80)
+        desc = st.text_area("메모 (선택)", height=60)
+        is_legacy = st.checkbox(
+            "레거시 대회",
+            help="대진표·경기 없이 1~3위만 기록하는 과거 대회용 모드",
+        )
 
         if st.form_submit_button("대회 생성"):
             if not name.strip():
                 st.error("대회 이름을 입력해 주세요.")
             else:
-                db.create_tournament(name.strip(), str(date), desc.strip())
+                db.create_tournament(name.strip(), str(date), desc.strip(), is_legacy)
                 st.success(f"'{name}' 대회를 만들었습니다!")
                 st.rerun()

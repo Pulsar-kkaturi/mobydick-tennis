@@ -75,6 +75,10 @@ uv run streamlit run app.py
 
 팀원들이 어디서든 접속할 수 있게 배포하려면 아래 단계를 따르세요.
 
+> **주의:** Streamlit Cloud 무료 플랜은 **Public 저장소만** 지원합니다.  
+> GitHub 저장소 Settings → Danger Zone → **Change visibility → Public** 으로 변경해 주세요.  
+> `.streamlit/secrets.toml`은 `.gitignore`에 등록되어 있어 키가 노출되지 않으니 안심하세요.
+
 ### 1단계 — GitHub에 코드 올리기
 
 ```bash
@@ -84,37 +88,53 @@ git add .
 git commit -m "초기 커밋"
 ```
 
-GitHub에서 새 저장소를 만들고:
+GitHub에서 새 저장소(Public)를 만들고:
 
 ```bash
 git remote add origin https://github.com/본인계정/저장소이름.git
 git push -u origin main
 ```
 
-> `.streamlit/secrets.toml`은 `.gitignore`에 이미 등록되어 있으므로 자동으로 제외됩니다.
-
 ### 2단계 — Streamlit Cloud 연결
 
 1. [share.streamlit.io](https://share.streamlit.io) 접속 후 GitHub 계정으로 로그인
 2. **New app** 클릭
-3. 방금 만든 저장소 선택, **Main file path**에 `app.py` 입력
-4. **Deploy** 클릭
+3. 아래와 같이 입력:
+
+| 항목 | 입력값 |
+|---|---|
+| Repository | `본인계정/mobydick-tennis` |
+| Branch | `main` |
+| Main file path | `app.py` |
+
+4. **Deploy** 클릭 → 1~2분 후 배포 완료
 
 ### 3단계 — Secrets 설정
 
-배포 환경에도 Supabase 키를 알려줘야 합니다.
+배포 환경에도 Supabase 키를 알려줘야 합니다.  
+(로컬의 `secrets.toml`은 GitHub에 올라가지 않으므로 별도로 입력해야 합니다)
 
-1. 배포된 앱 대시보드에서 **Settings → Secrets** 클릭
-2. 아래 내용을 붙여넣기:
+1. 배포된 앱 우측 상단 **⋮ → Settings → Secrets** 클릭
+2. 아래 내용을 그대로 붙여넣기 (본인 값으로 교체):
 
 ```toml
-SUPABASE_URL = "https://abcdefghijklmn.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+SUPABASE_URL = "https://xxxxxxxx.supabase.co"
+SUPABASE_KEY = "sb_secret_..."
 ```
 
-3. **Save** 후 앱 자동 재시작
+3. **Save** 클릭 → 앱 자동 재시작
 
-이후 코드를 수정해서 GitHub에 push하면 Streamlit Cloud가 자동으로 재배포합니다.
+### 이후 업데이트 방법
+
+코드를 수정한 뒤 GitHub에 push하면 Streamlit Cloud가 자동으로 감지해서 재배포합니다.  
+데이터(Supabase DB)는 재배포와 무관하게 유지됩니다.
+
+```bash
+git add .
+git commit -m "수정 내용"
+git push
+# → Streamlit Cloud 자동 재배포 (약 1~2분)
+```
 
 ---
 

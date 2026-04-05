@@ -20,6 +20,11 @@ selected_name = st.sidebar.selectbox("대회 선택", t_names)
 tournament = next(t for t in tournaments if t["name"] == selected_name)
 tid = tournament["id"]
 
+# 레거시 대회는 경기 입력 불필요
+if tournament.get("is_legacy"):
+    st.info("레거시 대회는 경기 입력이 없습니다. 순위표 페이지에서 1~3위를 직접 기록해 주세요.")
+    st.stop()
+
 # ── 경기 목록 ─────────────────────────────────────────────────────────────────
 matches = db.get_matches(tid)
 if not matches:
@@ -81,7 +86,7 @@ for m in filtered:
 # ── 추가 점수 입력 ────────────────────────────────────────────────────────────
 st.divider()
 with st.expander("추가 점수 입력 (토너먼트 보너스 등)"):
-    players = db.get_players(tid)
+    players = db.get_tournament_players(tid)
     extra_scores = db.get_extra_scores(tid)
     extra_map = {e["player_name"]: e for e in extra_scores}
 

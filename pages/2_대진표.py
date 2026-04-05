@@ -22,6 +22,11 @@ selected_name = st.sidebar.selectbox("대회 선택", t_names)
 tournament = next(t for t in tournaments if t["name"] == selected_name)
 tid = tournament["id"]
 
+# 레거시 대회는 대진표 불필요
+if tournament.get("is_legacy"):
+    st.info("레거시 대회는 대진표가 없습니다. 순위표 페이지에서 1~3위를 직접 기록해 주세요.")
+    st.stop()
+
 # ── 현재 대진표 표시 ──────────────────────────────────────────────────────────
 st.subheader(f"{selected_name} 대진표")
 matches = db.get_matches(tid)
@@ -56,7 +61,7 @@ st.divider()
 
 # ── 대진 자동 생성 ────────────────────────────────────────────────────────────
 with st.expander("대진 자동 생성 (라운드 로빈)"):
-    players = db.get_players(tid)
+    players = db.get_tournament_players(tid)
     if len(players) < 4:
         st.warning("자동 생성은 선수 4명 이상이 필요합니다.")
     else:
@@ -81,7 +86,7 @@ with st.expander("대진 자동 생성 (라운드 로빈)"):
 
 # ── 경기 수동 추가 ────────────────────────────────────────────────────────────
 with st.expander("경기 수동 추가"):
-    players = db.get_players(tid)
+    players = db.get_tournament_players(tid)
     player_names = ["(없음)"] + [p["name"] for p in players]
 
     with st.form("add_match_form", clear_on_submit=True):

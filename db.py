@@ -16,18 +16,18 @@ def get_client() -> Client:
 # ── 대회(Tournament) ──────────────────────────────────────────────────────────
 
 def get_tournaments():
-    """전체 대회 목록 반환 (최신순)"""
     db = get_client()
     res = db.table("tournaments").select("*").order("created_at", desc=True).execute()
     return res.data
 
 
-def create_tournament(name: str, date: str, description: str = ""):
+def create_tournament(name: str, date: str, description: str = "", is_legacy: bool = False):
     db = get_client()
     db.table("tournaments").insert({
         "name": name,
         "date": date or None,
         "description": description,
+        "is_legacy": is_legacy,
     }).execute()
 
 
@@ -41,33 +41,111 @@ def delete_tournament(tournament_id: int):
     db.table("tournaments").delete().eq("id", tournament_id).execute()
 
 
-# ── 선수(Player) ──────────────────────────────────────────────────────────────
+# ── 레거시 대회 순위(Legacy Results) ─────────────────────────────────────────
 
-def get_players(tournament_id: int):
-    """대회별 선수 목록"""
+def get_legacy_results(tournament_id: int):
+    """레거시 대회의 1~3위 결과 반환"""
     db = get_client()
-    res = db.table("players").select("*").eq("tournament_id", tournament_id).order("id").execute()
+    res = db.table("legacy_results").select("*").eq("tournament_id", tournament_id).order("rank").execute()
     return res.data
 
 
-def upsert_player(tournament_id: int, name: str, title: str, is_wildcard: bool, player_id: int = None):
+def set_legacy_result(tournament_id: int, rank: int, player_name: str):
+    """레거시 대회 특정 순위에 선수 기록 (있으면 덮어씀)"""
     db = get_client()
-    data = {"tournament_id": tournament_id, "name": name, "title": title, "is_wildcard": is_wildcard}
+    db.table("legacy_results").upsert({
+        "tournament_id": tournament_id,
+        "rank": rank,
+        "player_name": player_name,
+    }, on_conflict="tournament_id,rank").execute()
+
+
+def clear_legacy_result(tournament_id: int, rank: int):
+    """레거시 대회 특정 순위 기록 삭제"""
+    db = get_client()
+    db.table("legacy_results").delete().eq("tournament_id", tournament_id).eq("rank", rank).execute()
+
+
+# ── 전체 선수 풀(Global Players) ──────────────────────────────────────────────
+
+def get_all_players():
+    """전체 선수 풀 반환 (대회 무관)"""
+    db = get_client()
+    res = db.table("players").select("*").order("name").execute()
+    return res.data
+
+
+def upsert_global_player(name: str, player_id: int = None):
+    """전체 선수 풀에 선수 추가 또는 이름 수정"""
+    db = get_client()
     if player_id:
-        db.table("players").update(data).eq("id", player_id).execute()
+        db.table("players").update({"name": name}).eq("id", player_id).execute()
     else:
-        db.table("players").insert(data).execute()
+        db.table("players").insert({"name": name}).execute()
 
 
-def delete_player(player_id: int):
+def delete_global_player(player_id: int):
+    """전체 선수 풀에서 선수 삭제 (모든 대회 배정도 함께 삭제됨)"""
     db = get_client()
     db.table("players").delete().eq("id", player_id).execute()
+
+
+# ── 대회별 선수 배정(Tournament Players) ─────────────────────────────────────
+
+def get_tournament_players(tournament_id: int):
+    """
+    특정 대회에 배정된 선수 목록 반환.
+    scoring/schedule 로직과 호환되도록 name, is_wildcard 필드를 포함.
+    """
+    db = get_client()
+    res = (
+        db.table("tournament_players")
+        .select("id, title, is_wildcard, players(id, name)")
+        .eq("tournament_id", tournament_id)
+        .execute()
+    )
+    # 반환 형태를 기존 코드(scoring, schedule)와 호환되게 평탄화
+    result = []
+    for row in res.data:
+        result.append({
+            "id": row["id"],                        # tournament_players.id
+            "player_id": row["players"]["id"],
+            "name": row["players"]["name"],
+            "title": row["title"],
+            "is_wildcard": row["is_wildcard"],
+        })
+    return result
+
+
+def add_player_to_tournament(tournament_id: int, player_id: int, title: str = "", is_wildcard: bool = False):
+    """선수 풀에서 선수를 대회에 배정"""
+    db = get_client()
+    db.table("tournament_players").insert({
+        "tournament_id": tournament_id,
+        "player_id": player_id,
+        "title": title,
+        "is_wildcard": is_wildcard,
+    }).execute()
+
+
+def update_tournament_player(tp_id: int, title: str, is_wildcard: bool):
+    """대회 내 선수의 직함/와일드카드 수정"""
+    db = get_client()
+    db.table("tournament_players").update({
+        "title": title,
+        "is_wildcard": is_wildcard,
+    }).eq("id", tp_id).execute()
+
+
+def remove_player_from_tournament(tp_id: int):
+    """대회에서 선수 배정 해제"""
+    db = get_client()
+    db.table("tournament_players").delete().eq("id", tp_id).execute()
 
 
 # ── 경기(Match) ───────────────────────────────────────────────────────────────
 
 def get_matches(tournament_id: int):
-    """대회별 경기 목록"""
     db = get_client()
     res = db.table("matches").select("*").eq("tournament_id", tournament_id).order("round").order("court").execute()
     return res.data
@@ -111,29 +189,25 @@ def delete_extra_score(score_id: int):
 
 # ── 점수 설정(Scoring Config) ─────────────────────────────────────────────────
 
-# 기본 점수 설정값 (대회 처음 생성 시 이 값으로 초기화)
 DEFAULT_SCORING_CONFIG = [
-    {"item_key": "win_bonus",       "label": "경기 승리 보너스",        "is_active": True,  "score_value": 100},
-    {"item_key": "play_bonus",      "label": "경기 참여 점수",          "is_active": True,  "score_value": 10},
-    {"item_key": "score_diff",      "label": "게임 득실차",             "is_active": True,  "score_value": 1},
-    {"item_key": "wc_self_bonus",   "label": "WC 본인 보너스",          "is_active": True,  "score_value": 30},
-    {"item_key": "wc_partner_bonus","label": "WC 파트너 보너스 (승리 시)", "is_active": True, "score_value": 5},
-    {"item_key": "extra_score",     "label": "추가 점수 (토너먼트 등)",  "is_active": True,  "score_value": 0},
+    {"item_key": "win_bonus",        "label": "경기 승리 보너스",          "is_active": True,  "score_value": 100},
+    {"item_key": "play_bonus",       "label": "경기 참여 점수",            "is_active": True,  "score_value": 10},
+    {"item_key": "score_diff",       "label": "게임 득실차",               "is_active": True,  "score_value": 1},
+    {"item_key": "wc_self_bonus",    "label": "WC 본인 보너스",            "is_active": True,  "score_value": 30},
+    {"item_key": "wc_partner_bonus", "label": "WC 파트너 보너스 (승리 시)", "is_active": True,  "score_value": 5},
+    {"item_key": "extra_score",      "label": "추가 점수 (토너먼트 등)",    "is_active": True,  "score_value": 0},
 ]
 
 
 def get_scoring_config(tournament_id: int):
-    """대회별 점수 설정 조회. 없으면 기본값으로 초기화 후 반환."""
     db = get_client()
     res = db.table("scoring_config").select("*").eq("tournament_id", tournament_id).execute()
 
     if not res.data:
-        # 대회에 설정이 없으면 기본값 삽입
         rows = [{**item, "tournament_id": tournament_id} for item in DEFAULT_SCORING_CONFIG]
         db.table("scoring_config").insert(rows).execute()
         res = db.table("scoring_config").select("*").eq("tournament_id", tournament_id).execute()
 
-    # item_key를 키로 하는 딕셔너리로 변환해서 반환
     return {row["item_key"]: row for row in res.data}
 
 

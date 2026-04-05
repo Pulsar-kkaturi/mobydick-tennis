@@ -1,7 +1,7 @@
 """
 순위표 페이지
-- 대회별 실시간 순위 계산
-- 엑셀 내보내기
+- 일반 대회: 경기 결과 기반 실시간 순위 계산 + 엑셀 내보내기
+- 레거시 대회: 1~3위 선수를 선수 풀에서 직접 선택해서 기록
 """
 import io
 import streamlit as st
@@ -23,8 +23,57 @@ selected_name = st.sidebar.selectbox("대회 선택", t_names)
 tournament = next(t for t in tournaments if t["name"] == selected_name)
 tid = tournament["id"]
 
-# ── 데이터 로드 ───────────────────────────────────────────────────────────────
-players = db.get_players(tid)
+# ════════════════════════════════════════════════════════════════════════════════
+# 레거시 대회: 1~3위 직접 입력
+# ════════════════════════════════════════════════════════════════════════════════
+if tournament.get("is_legacy"):
+    st.subheader(f"{selected_name} — 레거시 순위 기록")
+    st.caption("과거 대회 결과를 1~3위만 기록합니다. 시즌 랭킹 포인트 산정에 반영됩니다.")
+
+    # 전체 선수 풀에서 선택
+    all_players = db.get_all_players()
+    player_names = ["(선택 안 함)"] + [p["name"] for p in all_players]
+
+    # 현재 저장된 결과 로드
+    existing = {r["rank"]: r["player_name"] for r in db.get_legacy_results(tid)}
+
+    with st.form("legacy_form"):
+        st.markdown("**순위별 선수 선택**")
+
+        rank_labels = {1: "🥇 1위", 2: "🥈 2위", 3: "🥉 3위"}
+        selections = {}
+
+        for rank, label in rank_labels.items():
+            current = existing.get(rank, "(선택 안 함)")
+            default_idx = player_names.index(current) if current in player_names else 0
+            selections[rank] = st.selectbox(label, player_names, index=default_idx, key=f"legacy_rank_{rank}")
+
+        if st.form_submit_button("저장"):
+            for rank, name in selections.items():
+                if name == "(선택 안 함)":
+                    db.clear_legacy_result(tid, rank)
+                else:
+                    db.set_legacy_result(tid, rank, name)
+            st.success("저장했습니다.")
+            st.rerun()
+
+    # 현재 기록 미리보기
+    results = db.get_legacy_results(tid)
+    if results:
+        st.divider()
+        st.markdown("**현재 기록**")
+        for r in results:
+            medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(r["rank"], "")
+            st.write(f"{medal} {r['rank']}위 — **{r['player_name']}**")
+    else:
+        st.info("아직 기록된 순위가 없습니다.")
+
+    st.stop()  # 레거시 대회는 여기서 종료
+
+# ════════════════════════════════════════════════════════════════════════════════
+# 일반 대회: 경기 결과 기반 순위 계산
+# ════════════════════════════════════════════════════════════════════════════════
+players = db.get_tournament_players(tid)
 matches = db.get_matches(tid)
 config = db.get_scoring_config(tid)
 extra_scores = db.get_extra_scores(tid)
@@ -33,24 +82,9 @@ if not players:
     st.info("선수가 없습니다. 선수 관리 페이지에서 먼저 등록해 주세요.")
     st.stop()
 
-# ── 순위 계산 ─────────────────────────────────────────────────────────────────
 standings = calculate_standings(players, matches, config, extra_scores)
 
-# ── 표 출력 ───────────────────────────────────────────────────────────────────
 st.subheader(f"{selected_name} 순위표")
-
-# 활성화된 항목에 맞춰 표시 컬럼 동적 구성
-col_labels = {
-    "rank":            "순위",
-    "name":            "이름",
-    "wins":            "승리수",
-    "played":          "경기수",
-    "score_diff":      "득실차",
-    "wc_bonus":        "WC보너스",
-    "partner_bonus":   "파트너보너스",
-    "extra":           "추가점수",
-    "total":           "총점",
-}
 
 rows = []
 for s in standings:
@@ -68,11 +102,9 @@ for s in standings:
 
 df = pd.DataFrame(rows)
 
-# 1위는 금색 배경 스타일
 def highlight_top3(row):
     colors = {1: "background-color: #FFD700", 2: "background-color: #C0C0C0", 3: "background-color: #CD7F32"}
-    color = colors.get(row["순위"], "")
-    return [color] * len(row)
+    return [colors.get(row["순위"], "")] * len(row)
 
 st.dataframe(
     df.style.apply(highlight_top3, axis=1),
@@ -82,21 +114,19 @@ st.dataframe(
 
 # ── 엑셀 내보내기 ─────────────────────────────────────────────────────────────
 st.divider()
-col1, col2 = st.columns([1, 3])
-with col1:
-    buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="순위표")
-    buffer.seek(0)
+buffer = io.BytesIO()
+with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+    df.to_excel(writer, index=False, sheet_name="순위표")
+buffer.seek(0)
 
-    st.download_button(
-        label="엑셀로 내보내기",
-        data=buffer,
-        file_name=f"{selected_name}_순위표.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
+st.download_button(
+    label="엑셀로 내보내기",
+    data=buffer,
+    file_name=f"{selected_name}_순위표.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+)
 
-# ── 상세 설정 정보 ────────────────────────────────────────────────────────────
+# ── 현재 점수 계산 방식 확인 ──────────────────────────────────────────────────
 with st.expander("현재 점수 계산 방식 확인"):
     for key, row in config.items():
         status = "✅" if row["is_active"] else "❌"

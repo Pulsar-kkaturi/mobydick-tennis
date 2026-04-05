@@ -23,7 +23,7 @@ selected_name = st.sidebar.selectbox("대회 선택", t_names)
 tournament = next(t for t in tournaments if t["name"] == selected_name)
 tid = tournament["id"]
 
-players = db.get_players(tid)
+players = db.get_tournament_players(tid)
 matches = db.get_matches(tid)
 config = db.get_scoring_config(tid)
 extra_scores = db.get_extra_scores(tid)

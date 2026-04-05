@@ -1,59 +1,84 @@
 -- 모비딕 테니스 Supabase 스키마
 -- Supabase 대시보드 > SQL Editor에서 이 파일 전체를 붙여넣고 실행
+-- (기존 테이블이 있다면 drop 후 재생성됩니다)
+
+drop table if exists scoring_config cascade;
+drop table if exists extra_scores cascade;
+drop table if exists matches cascade;
+drop table if exists tournament_players cascade;
+drop table if exists players cascade;
+drop table if exists tournaments cascade;
 
 -- 대회 테이블
-create table if not exists tournaments (
+create table tournaments (
   id bigint generated always as identity primary key,
-  name text not null,                  -- 대회 이름 (예: 2026 상반기)
-  date date,                           -- 대회 날짜
-  description text,                    -- 메모
-  is_finished boolean default false,   -- 완료 여부
+  name text not null,
+  date date,
+  description text,
+  is_finished boolean default false,
+  is_legacy boolean default false,     -- 레거시 모드: 대진/경기 없이 순위만 기록
   created_at timestamptz default now()
 );
 
--- 선수 테이블 (대회별 등록)
-create table if not exists players (
+-- 레거시 대회 순위 기록 (1~3위만 저장)
+create table legacy_results (
   id bigint generated always as identity primary key,
   tournament_id bigint references tournaments(id) on delete cascade,
-  title text,                          -- 직함 (시드1, 일반2, WC1 등)
-  name text not null,                  -- 이름
-  is_wildcard boolean default false,   -- 와일드카드 여부 (보너스 대상)
+  rank integer not null,               -- 1, 2, 3
+  player_name text not null,
+  unique(tournament_id, rank)
+);
+
+-- 전체 선수 풀 (대회에 종속되지 않음)
+create table players (
+  id bigint generated always as identity primary key,
+  name text not null unique,   -- 이름은 전체에서 유일
   created_at timestamptz default now()
+);
+
+-- 대회별 선수 배정 (선수 풀에서 선택 + 대회 내 역할 설정)
+create table tournament_players (
+  id bigint generated always as identity primary key,
+  tournament_id bigint references tournaments(id) on delete cascade,
+  player_id bigint references players(id) on delete cascade,
+  title text,                          -- 대회 내 직함 (시드1, 일반2 등)
+  is_wildcard boolean default false,   -- 이 대회에서 와일드카드 여부
+  unique(tournament_id, player_id)     -- 한 대회에 같은 선수 중복 배정 불가
 );
 
 -- 경기 기록 테이블
-create table if not exists matches (
+create table matches (
   id bigint generated always as identity primary key,
   tournament_id bigint references tournaments(id) on delete cascade,
-  round text,                          -- 라운드 (R1, R2 ...)
-  court text,                          -- 코트 (A, B ...)
-  team1_player1 text,                  -- 팀1 선수1 이름
-  team1_player2 text,                  -- 팀1 선수2 이름 (단식이면 null)
+  round text,
+  court text,
+  team1_player1 text,
+  team1_player2 text,
   team2_player1 text,
   team2_player2 text,
-  team1_score integer,                 -- 팀1 게임 수
-  team2_score integer,                 -- 팀2 게임 수
-  match_type text,                     -- 경기 유형 설명
+  team1_score integer,
+  team2_score integer,
+  match_type text,
   created_at timestamptz default now()
 );
 
--- 추가 점수 테이블 (토너먼트 보너스 등 수동 입력)
-create table if not exists extra_scores (
+-- 추가 점수 테이블
+create table extra_scores (
   id bigint generated always as identity primary key,
   tournament_id bigint references tournaments(id) on delete cascade,
   player_name text not null,
   score integer default 0,
-  note text,                           -- 점수 사유 메모
+  note text,
   created_at timestamptz default now()
 );
 
--- 점수 설정 테이블 (대회별 커스텀)
-create table if not exists scoring_config (
+-- 점수 설정 테이블 (대회별)
+create table scoring_config (
   id bigint generated always as identity primary key,
   tournament_id bigint references tournaments(id) on delete cascade,
-  item_key text not null,              -- 설정 항목 키 (예: win_bonus)
-  label text not null,                 -- 표시 이름
-  is_active boolean default true,      -- 활성화 여부
-  score_value integer default 0,       -- 점수값
+  item_key text not null,
+  label text not null,
+  is_active boolean default true,
+  score_value integer default 0,
   unique(tournament_id, item_key)
 );
