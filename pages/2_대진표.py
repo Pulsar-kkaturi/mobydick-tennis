@@ -66,6 +66,16 @@ st.divider()
 
 # 잠금 상태면 대진 생성·추가 섹션 자체를 숨김
 if not is_locked:
+    # ── 대진 일괄 삭제 ────────────────────────────────────────────────────────
+    if matches:
+        with st.expander("⚠️ 대진 일괄 삭제"):
+            st.warning("경기 결과(점수)를 포함한 **모든 경기**가 삭제됩니다.")
+            if st.button("전체 삭제 확인", key="delete_all_btn", type="primary"):
+                db.delete_all_matches(tid)
+                st.success("모든 경기를 삭제했습니다.")
+                st.rerun()
+
+if not is_locked:
 
     # ── 대진 자동 생성 ────────────────────────────────────────────────────────
     with st.expander("대진 자동 생성"):
@@ -117,30 +127,49 @@ if not is_locked:
 
             if n < min_required:
                 st.warning(f"{match_type} 경기를 위해 최소 {min_required}명이 필요합니다.")
-            elif st.button("대진 생성", key="gen_btn", type="primary"):
-                schedule = generate_schedule(
-                    players,
-                    courts=courts,
-                    match_type=match_type,
-                    matches_per_person=int(matches_per_person),
-                    randomize=randomize,
+            else:
+                existing_matches = db.get_matches(tid)
+                has_scores = any(
+                    m["team1_score"] is not None for m in existing_matches
                 )
 
-                if not schedule:
-                    st.error("대진을 생성할 수 없습니다. 선수 수나 설정을 확인해 주세요.")
-                else:
-                    # WC 정보 기반 match_type 상세 표기 (단식은 그대로)
-                    if match_type == "복식":
+                # 기존 경기가 있으면 경고 표시
+                if existing_matches:
+                    if has_scores:
+                        st.warning(
+                            f"⚠️ 현재 {len(existing_matches)}개 경기가 있고 일부에 점수가 입력되어 있습니다. "
+                            "재생성 시 **모든 경기와 점수가 삭제**됩니다."
+                        )
+                    else:
+                        st.info(f"기존 {len(existing_matches)}개 경기를 삭제하고 새로 생성합니다.")
+
+                if st.button("대진 생성 (기존 경기 초기화)", key="gen_btn", type="primary"):
+                    schedule = generate_schedule(
+                        players,
+                        courts=courts,
+                        match_type=match_type,
+                        matches_per_person=int(matches_per_person),
+                        randomize=randomize,
+                    )
+
+                    if not schedule:
+                        st.error("대진을 생성할 수 없습니다. 선수 수나 설정을 확인해 주세요.")
+                    else:
+                        # 기존 경기 전부 삭제 후 새로 삽입
+                        db.delete_all_matches(tid)
+
+                        # WC 정보 기반 match_type 상세 표기 (복식만)
+                        if match_type == "복식":
+                            for m in schedule:
+                                t1 = [m["team1_player1"], m.get("team1_player2")]
+                                t2 = [m["team2_player1"], m.get("team2_player2")]
+                                m["match_type"] = infer_match_type(t1, t2, wc_map)
+
                         for m in schedule:
-                            t1 = [m["team1_player1"], m.get("team1_player2")]
-                            t2 = [m["team2_player1"], m.get("team2_player2")]
-                            m["match_type"] = infer_match_type(t1, t2, wc_map)
+                            db.upsert_match(tid, m)
 
-                    for m in schedule:
-                        db.upsert_match(tid, m)
-
-                    st.success(f"{len(schedule)}경기 생성 완료! (총 {schedule[-1]['round']} 까지)")
-                    st.rerun()
+                        st.success(f"{len(schedule)}경기 생성 완료! ({schedule[-1]['round']} 까지)")
+                        st.rerun()
 
     # ── 경기 수동 추가 ────────────────────────────────────────────────────────
     with st.expander("경기 수동 추가"):

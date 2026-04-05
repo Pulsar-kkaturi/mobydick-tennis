@@ -267,6 +267,12 @@ def delete_match(match_id: int):
     db.table("matches").delete().eq("id", match_id).execute()
 
 
+def delete_all_matches(tournament_id: int):
+    """대회의 모든 경기를 삭제 (자동 생성 초기화 용)."""
+    db = get_client()
+    db.table("matches").delete().eq("tournament_id", tournament_id).execute()
+
+
 # ── 추가 점수(Extra Score) ────────────────────────────────────────────────────
 
 def get_extra_scores(tournament_id: int):
