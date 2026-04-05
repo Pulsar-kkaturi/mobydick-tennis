@@ -70,13 +70,13 @@ else:
             st.info("아직 순위 포인트를 얻은 선수가 없습니다. (각 대회 1~3위를 달성해야 부여)")
         else:
             rows = []
-            for i, r in enumerate(season_ranking):
+            for r in season_ranking:
                 detail = r["detail"]
                 gold   = sum(1 for info in detail.values() if info["rank"] == 1)
                 silver = sum(1 for info in detail.values() if info["rank"] == 2)
                 bronze = sum(1 for info in detail.values() if info["rank"] == 3)
                 rows.append({
-                    "시즌순위": i + 1,
+                    "시즌순위": r["rank"],
                     "이름": r["name"],
                     "랭킹포인트": r["points"],
                     "🥇": gold,

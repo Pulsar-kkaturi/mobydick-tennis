@@ -89,7 +89,10 @@ for m in filtered:
 
 # ── 추가 점수 입력 ────────────────────────────────────────────────────────────
 st.divider()
-with st.expander("추가 점수 입력 (토너먼트 보너스 등)", disabled=is_locked):
+with st.expander("추가 점수 입력 (토너먼트 보너스 등)"):
+    if is_locked:
+        st.warning("🔒 완료 또는 승인된 대회는 추가 점수를 수정할 수 없습니다.")
+
     players = db.get_tournament_players(tid)
     extra_scores = db.get_extra_scores(tid)
     extra_map = {e["player_name"]: e for e in extra_scores}
@@ -108,6 +111,7 @@ with st.expander("추가 점수 입력 (토너먼트 보너스 등)", disabled=i
                 value=existing["score"] if existing else 0,
                 key=f"extra_{p['name']}",
                 label_visibility="collapsed",
+                disabled=is_locked,
             )
         with col3:
             note_val = st.text_input(
@@ -116,9 +120,10 @@ with st.expander("추가 점수 입력 (토너먼트 보너스 등)", disabled=i
                 key=f"note_{p['name']}",
                 label_visibility="collapsed",
                 placeholder="사유 (선택)",
+                disabled=is_locked,
             )
 
-    if st.button("추가 점수 전체 저장"):
+    if st.button("추가 점수 전체 저장", disabled=is_locked):
         for p in players:
             existing = extra_map.get(p["name"])
             score_val = st.session_state.get(f"extra_{p['name']}", 0)

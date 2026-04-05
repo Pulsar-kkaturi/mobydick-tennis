@@ -25,34 +25,40 @@ if tournament.get("is_legacy"):
     st.subheader(f"{selected_name} — 레거시 순위 기록")
     st.caption("과거 대회 결과를 1~3위만 기록합니다. 시즌 랭킹 포인트 산정에 반영됩니다.")
 
-    # 전체 선수 풀에서 선택
-    all_players = db.get_all_players()
-    player_names = ["(선택 안 함)"] + [p["name"] for p in all_players]
+    # 완료/승인된 대회는 수정 잠금
+    is_locked = tournament.get("is_finished") or tournament.get("is_approved")
+    if is_locked:
+        lock_reason = "승인된" if tournament.get("is_approved") else "완료 처리된"
+        st.warning(f"🔒 {lock_reason} 대회입니다. 순위를 수정할 수 없습니다.")
 
-    # 현재 저장된 결과 로드
+    # 현재 기록 로드
     existing = {r["rank"]: r["player_name"] for r in db.get_legacy_results(tid)}
 
-    with st.form("legacy_form"):
-        st.markdown("**순위별 선수 선택**")
+    if not is_locked:
+        # 전체 선수 풀에서 선택
+        all_players = db.get_all_players()
+        player_names = ["(선택 안 함)"] + [p["name"] for p in all_players]
 
-        rank_labels = {1: "🥇 1위", 2: "🥈 2위", 3: "🥉 3위"}
-        selections = {}
+        with st.form("legacy_form"):
+            st.markdown("**순위별 선수 선택**")
+            rank_labels = {1: "🥇 1위", 2: "🥈 2위", 3: "🥉 3위"}
+            selections = {}
 
-        for rank, label in rank_labels.items():
-            current = existing.get(rank, "(선택 안 함)")
-            default_idx = player_names.index(current) if current in player_names else 0
-            selections[rank] = st.selectbox(label, player_names, index=default_idx, key=f"legacy_rank_{rank}")
+            for rank, label in rank_labels.items():
+                current = existing.get(rank, "(선택 안 함)")
+                default_idx = player_names.index(current) if current in player_names else 0
+                selections[rank] = st.selectbox(label, player_names, index=default_idx, key=f"legacy_rank_{rank}")
 
-        if st.form_submit_button("저장"):
-            for rank, name in selections.items():
-                if name == "(선택 안 함)":
-                    db.clear_legacy_result(tid, rank)
-                else:
-                    db.set_legacy_result(tid, rank, name)
-            st.success("저장했습니다.")
-            st.rerun()
+            if st.form_submit_button("저장"):
+                for rank, name in selections.items():
+                    if name == "(선택 안 함)":
+                        db.clear_legacy_result(tid, rank)
+                    else:
+                        db.set_legacy_result(tid, rank, name)
+                st.success("저장했습니다.")
+                st.rerun()
 
-    # 현재 기록 미리보기
+    # 현재 기록 미리보기 (잠금 여부 무관하게 항상 표시)
     results = db.get_legacy_results(tid)
     if results:
         st.divider()

@@ -79,9 +79,11 @@ if not is_locked:
 
     # ── 대진 자동 생성 ────────────────────────────────────────────────────────
     with st.expander("대진 자동 생성"):
+        import math
         players = db.get_tournament_players(tid)
+        n = len(players)
 
-        if len(players) < 2:
+        if n < 2:
             st.warning("자동 생성은 선수 2명 이상이 필요합니다.")
         else:
             wc_map = {p["name"]: p["is_wildcard"] for p in players}
@@ -89,10 +91,8 @@ if not is_locked:
             col_a, col_b = st.columns(2)
             with col_a:
                 match_type = st.radio(
-                    "경기 방식",
-                    ["복식", "단식"],
-                    horizontal=True,
-                    key="gen_match_type",
+                    "경기 방식", ["복식", "단식"],
+                    horizontal=True, key="gen_match_type",
                 )
             with col_b:
                 randomize = st.checkbox("선수 순서 랜덤 섞기", value=True, key="gen_randomize")
@@ -102,51 +102,56 @@ if not is_locked:
                 court_count = st.slider("코트 수", min_value=1, max_value=4, value=2, key="gen_courts")
             with col_d:
                 matches_per_person = st.number_input(
-                    "인당 경기 수",
-                    min_value=1, max_value=20, value=3, step=1, key="gen_mpp",
+                    "인당 경기 수", min_value=1, max_value=20, value=3, step=1, key="gen_mpp",
                 )
 
-            courts = ["A", "B", "C", "D"][:court_count]
             players_per_match = 4 if match_type == "복식" else 2
-            min_required = players_per_match  # 최소 1경기 가능 인원
 
-            # 예상 라운드 수 미리 표시
-            import math
-            n = len(players)
-            active_per_round = court_count * players_per_match
-            active_per_round = (min(active_per_round, n) // players_per_match) * players_per_match
-            if active_per_round > 0:
-                total_slots = n * matches_per_person
-                est_rounds = math.ceil(total_slots / active_per_round)
-                st.caption(
-                    f"선수 {n}명 · 코트 {court_count}개 · {match_type} → "
-                    f"라운드당 {active_per_round}명 활동 · 예상 **{est_rounds}라운드**"
+            # 실제 사용 가능한 코트 수: 선수 수 ÷ 코트당 필요 인원
+            actual_courts = min(court_count, n // players_per_match)
+            actual_court_labels = ["A", "B", "C", "D"][:actual_courts]
+            actual_active = actual_courts * players_per_match
+
+            # ── 예상 결과 미리보기 ────────────────────────────────────────────
+            if actual_courts == 0:
+                st.error(
+                    f"⛔ {match_type} 1경기에 {players_per_match}명이 필요합니다. "
+                    f"현재 배정 선수: **{n}명** (부족)"
                 )
             else:
-                st.warning(f"{match_type} 경기를 위해 선수가 더 필요합니다.")
+                if actual_courts < court_count:
+                    st.warning(
+                        f"⚠️ 코트 {court_count}개 요청 → 선수 {n}명으로는 "
+                        f"**코트 {actual_courts}개** ({', '.join(actual_court_labels)})만 사용 가능합니다. "
+                        f"({match_type} 코트 1개당 {players_per_match}명 필요)"
+                    )
 
-            if n < min_required:
-                st.warning(f"{match_type} 경기를 위해 최소 {min_required}명이 필요합니다.")
-            else:
+                sitting_per_round = n - actual_active
+                est_rounds = math.ceil((n * int(matches_per_person)) / actual_active)
+                st.info(
+                    f"선수 **{n}명** · 코트 **{actual_courts}개** "
+                    f"({', '.join(actual_court_labels)}) · {match_type}  \n"
+                    f"라운드당 **{actual_active}명** 활동"
+                    + (f" / **{sitting_per_round}명** 휴식" if sitting_per_round > 0 else " (전원 참가)")
+                    + f" · 예상 **{est_rounds}라운드**"
+                )
+
+                # 기존 경기 여부 안내
                 existing_matches = db.get_matches(tid)
-                has_scores = any(
-                    m["team1_score"] is not None for m in existing_matches
-                )
-
-                # 기존 경기가 있으면 경고 표시
                 if existing_matches:
+                    has_scores = any(m["team1_score"] is not None for m in existing_matches)
                     if has_scores:
                         st.warning(
-                            f"⚠️ 현재 {len(existing_matches)}개 경기가 있고 일부에 점수가 입력되어 있습니다. "
+                            f"⚠️ 현재 {len(existing_matches)}개 경기 중 점수가 입력된 경기가 있습니다. "
                             "재생성 시 **모든 경기와 점수가 삭제**됩니다."
                         )
                     else:
-                        st.info(f"기존 {len(existing_matches)}개 경기를 삭제하고 새로 생성합니다.")
+                        st.info(f"기존 {len(existing_matches)}개 경기를 삭제 후 새로 생성합니다.")
 
                 if st.button("대진 생성 (기존 경기 초기화)", key="gen_btn", type="primary"):
                     schedule = generate_schedule(
                         players,
-                        courts=courts,
+                        courts=actual_court_labels,   # 실제 사용 코트 목록 사용
                         match_type=match_type,
                         matches_per_person=int(matches_per_person),
                         randomize=randomize,
@@ -155,10 +160,8 @@ if not is_locked:
                     if not schedule:
                         st.error("대진을 생성할 수 없습니다. 선수 수나 설정을 확인해 주세요.")
                     else:
-                        # 기존 경기 전부 삭제 후 새로 삽입
                         db.delete_all_matches(tid)
 
-                        # WC 정보 기반 match_type 상세 표기 (복식만)
                         if match_type == "복식":
                             for m in schedule:
                                 t1 = [m["team1_player1"], m.get("team1_player2")]

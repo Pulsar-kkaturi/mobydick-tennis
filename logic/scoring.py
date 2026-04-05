@@ -156,10 +156,10 @@ def calculate_standings(players: list, matches: list, config: dict, extra_scores
         )
         results.append({**s, "extra": extra, "total": total})
 
-    # 총점 내림차순 → 득실차 내림차순 → 승리수 내림차순으로 정렬
-    results.sort(key=lambda x: (-x["total"], -x["score_diff"], -x["wins"]))
+    # 정렬: 총점·득실차·승리수 내림차순, 완전 동점이면 이름 가나다순 (표시 순서만, 순위에는 영향 없음)
+    results.sort(key=lambda x: (-x["total"], -x["score_diff"], -x["wins"], x["name"]))
 
-    # 순위 부여 (동점자는 같은 순위)
+    # 순위: 총점이 같으면 동일 순위 (표준 경쟁 순위, 건너뛰기)
     for i, r in enumerate(results):
         if i == 0:
             r["rank"] = 1
@@ -198,5 +198,16 @@ def get_season_ranking(tournaments: list, standings_map: dict) -> list:
             season[name]["points"] += pts
             season[name]["detail"][t["name"]] = {"rank": rank, "pts": pts}
 
-    result = sorted(season.values(), key=lambda x: -x["points"])
+    # 랭킹 포인트 내림차순, 동점이면 이름순 (표시만)
+    result = sorted(season.values(), key=lambda x: (-x["points"], x["name"]))
+
+    # 시즌 순위: 포인트 동일하면 동일 순위
+    for i, r in enumerate(result):
+        if i == 0:
+            r["rank"] = 1
+        elif r["points"] == result[i - 1]["points"]:
+            r["rank"] = result[i - 1]["rank"]
+        else:
+            r["rank"] = i + 1
+
     return result
