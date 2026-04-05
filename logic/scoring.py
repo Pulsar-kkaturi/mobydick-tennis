@@ -78,7 +78,7 @@ def calculate_standings(players: list, matches: list, config: dict, extra_scores
     diff_pt   = cfg("score_diff")
     wc_self   = cfg("wc_self_bonus")
     wc_part   = cfg("wc_partner_bonus")
-    extra_on  = config.get("extra_score", {}).get("is_active", True)
+    # 추가 점수: 경기입력에서 저장한 값은 설정과 무관하게 항상 총점에 반영 (요청 사항)
 
     # 선수 이름 → 와일드카드 여부 맵
     wc_map = {p["name"]: p["is_wildcard"] for p in players}
@@ -143,7 +143,7 @@ def calculate_standings(players: list, matches: list, config: dict, extra_scores
     # 최종 점수 계산
     results = []
     for name, s in stats.items():
-        extra = extra_map.get(name, 0) if extra_on else 0
+        extra = extra_map.get(name, 0)
         total = (
             s["wins"]         * win_pt
             + s["draws"]      * draw_pt
