@@ -70,15 +70,30 @@ st.divider()
 
 # ── 비밀번호 변경 ─────────────────────────────────────────────────────────────
 st.subheader("비밀번호 변경")
-st.caption("현재 비밀번호를 먼저 입력해 주세요.")
 
-with st.form("change_pw_form"):
-    cur_pw = st.text_input("현재 비밀번호", type="password")
-    new_pw = st.text_input("새 비밀번호", type="password", placeholder="영문+숫자 8자 이상")
-    new_pw2 = st.text_input("새 비밀번호 확인", type="password")
-    if st.form_submit_button("비밀번호 변경", type="primary"):
-        ok, msg = auth.change_password(cur_pw, new_pw, new_pw2)
-        if ok:
-            st.success(msg)
-        else:
-            st.error(msg)
+if auth.is_otp_reset_mode():
+    # OTP 인증 완료 상태 → 현재 비밀번호 불필요
+    st.info("🔑 이메일 인증(OTP)이 완료된 상태입니다. 현재 비밀번호 없이 새 비밀번호를 설정할 수 있습니다.")
+    with st.form("change_pw_otp_form"):
+        new_pw = st.text_input("새 비밀번호", type="password", placeholder="영문+숫자 8자 이상")
+        new_pw2 = st.text_input("새 비밀번호 확인", type="password")
+        if st.form_submit_button("비밀번호 변경", type="primary"):
+            ok, msg = auth.submit_new_password(new_pw, new_pw2)
+            if ok:
+                st.success(msg)
+                st.rerun()
+            else:
+                st.error(msg)
+else:
+    # 일반 로그인 상태 → 현재 비밀번호 확인 필요
+    st.caption("현재 비밀번호를 먼저 입력해 주세요.")
+    with st.form("change_pw_form"):
+        cur_pw = st.text_input("현재 비밀번호", type="password")
+        new_pw = st.text_input("새 비밀번호", type="password", placeholder="영문+숫자 8자 이상")
+        new_pw2 = st.text_input("새 비밀번호 확인", type="password")
+        if st.form_submit_button("비밀번호 변경", type="primary"):
+            ok, msg = auth.change_password(cur_pw, new_pw, new_pw2)
+            if ok:
+                st.success(msg)
+            else:
+                st.error(msg)
