@@ -85,13 +85,18 @@ else:
                     "🥉": bronze,
                 })
 
-            df = pd.DataFrame(rows)
+            with st.expander(f"시즌 랭킹 ({len(rows)}명)", expanded=True):
+                page_rows, paged_sr = db.get_page_slice(rows, "season_ranking_page")
+                df = pd.DataFrame(page_rows)
 
-            def highlight_top3(row):
-                colors = {1: "background-color: #FFD700", 2: "background-color: #C0C0C0", 3: "background-color: #CD7F32"}
-                return [colors.get(row["시즌순위"], "")] * len(row)
+                def highlight_top3(row):
+                    colors = {1: "background-color: #FFD700", 2: "background-color: #C0C0C0", 3: "background-color: #CD7F32"}
+                    return [colors.get(row["시즌순위"], "")] * len(row)
 
-            st.dataframe(df.style.apply(highlight_top3, axis=1), use_container_width=True, hide_index=True)
+                st.dataframe(df.style.apply(highlight_top3, axis=1), use_container_width=True, hide_index=True)
+                if paged_sr:
+                    db.render_page_nav(rows, "season_ranking_page")
+
             st.caption("랭킹 포인트: 1위=3점 / 2위=2점 / 3위=1점 / 4위 이하=미부여")
 
 st.divider()
