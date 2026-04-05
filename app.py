@@ -9,7 +9,7 @@ import db
 
 st.set_page_config(
     page_title="모비딕 테니스",
-    page_icon="🎾",
+    page_icon="Assets/LOGO_2026_HJA.png",
     layout="wide",
 )
 
@@ -62,6 +62,7 @@ with st.sidebar:
 
 # ── 페이지 정의 ───────────────────────────────────────────────────────────────
 login_page  = st.Page("pages/0_로그인.py",      title="로그인",    icon="🔐")
+my_info     = st.Page("pages/7_내정보.py",      title="내 정보",   icon="👤")
 dashboard   = st.Page("pages/dashboard.py",     title="대시보드",  icon="🏠", default=True)
 ranking     = st.Page("pages/4_순위표.py",      title="순위표",    icon="🏆")
 stats       = st.Page("pages/5_통계.py",        title="통계",      icon="📊")
@@ -80,20 +81,20 @@ if auth.is_admin():
         "관리": [players],
         "대회관리": [t_settings, bracket, match_in],
         "운영": [admin_page],
-        "계정": [login_page],
+        "계정": [my_info],          # 로그인 상태 → 내 정보
     })
 elif auth.is_user():
     nav = st.navigation({
         "": [dashboard, ranking, stats],
         "관리": [players],
         "대회관리": [t_settings, bracket, match_in],
-        "계정": [login_page],
+        "계정": [my_info],          # 로그인 상태 → 내 정보
     })
 else:
-    # 게스트: 로그인 페이지 + 조회만
+    # 게스트: 로그인 페이지만
     nav = st.navigation({
         "": [dashboard, ranking, stats],
-        "계정": [login_page],
+        "계정": [login_page],       # 비로그인 → 로그인 페이지
     })
 
 nav.run()

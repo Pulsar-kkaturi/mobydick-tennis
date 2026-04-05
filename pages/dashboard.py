@@ -9,8 +9,12 @@ import db
 import auth
 from logic.scoring import calculate_standings, get_season_ranking
 
-st.title("🎾 모비딕 테니스")
-st.caption("대회 관리 & 순위 시스템")
+col_logo, col_title = st.columns([1, 6])
+with col_logo:
+    st.image("Assets/LOGO_2026_HJA.png", width=90)
+with col_title:
+    st.title("모비딕 테니스")
+    st.caption("대회 관리 & 순위 시스템")
 
 tournaments = db.get_tournaments()
 logged_in = auth.is_logged_in()

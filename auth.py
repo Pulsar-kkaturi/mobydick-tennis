@@ -134,6 +134,69 @@ def logout():
     st.session_state.pop("otp_reset_email", None)   # OTP 재설정 진행 중이었으면 함께 제거
 
 
+# ── 내 정보 수정 (로그인 상태에서) ───────────────────────────────────────────
+
+def get_my_profile() -> dict:
+    """현재 로그인 유저의 profiles 행 반환. 없으면 빈 dict."""
+    user = get_user()
+    if not user:
+        return {}
+    try:
+        client = db.get_client()
+        res = client.table("profiles").select("full_name, email, birth_date, role").eq("id", str(user.id)).execute()
+        return res.data[0] if res.data else {}
+    except Exception:
+        return {}
+
+
+def update_my_profile(full_name: str, birth_date) -> tuple[bool, str]:
+    """이름·생년월일 수정. 이메일은 로그인 ID라 변경 불가."""
+    user = get_user()
+    if not user:
+        return False, "로그인이 필요합니다."
+    name = (full_name or "").strip()
+    if not name:
+        return False, "이름을 입력해 주세요."
+    if birth_date is None:
+        return False, "생년월일을 선택해 주세요."
+    birth_str = birth_date.isoformat() if hasattr(birth_date, "isoformat") else str(birth_date)
+    try:
+        client = db.get_client()
+        client.table("profiles").update({"full_name": name, "birth_date": birth_str}).eq("id", str(user.id)).execute()
+        return True, "저장했습니다."
+    except Exception as e:
+        return False, f"저장 실패: {e}"
+
+
+def change_password(current_password: str, new_password: str, new_password_confirm: str) -> tuple[bool, str]:
+    """
+    현재 비밀번호로 재인증 후 새 비밀번호로 변경.
+    이미 로그인된 상태에서만 호출.
+    """
+    user = get_user()
+    if not user or not getattr(user, "email", None):
+        return False, "로그인이 필요합니다."
+    if not current_password:
+        return False, "현재 비밀번호를 입력해 주세요."
+    if new_password != new_password_confirm:
+        return False, "새 비밀번호 확인이 일치하지 않습니다."
+    ok, msg = validate_signup_password(new_password)
+    if not ok:
+        return False, msg
+    try:
+        client = db.get_client()
+        # 현재 비밀번호로 재인증 (틀리면 예외 발생)
+        client.auth.sign_in_with_password({"email": user.email, "password": current_password})
+        # 재인증 성공 → 새 비밀번호로 업데이트
+        client.auth.update_user({"password": new_password})
+        return True, "비밀번호가 변경되었습니다."
+    except Exception as e:
+        err = str(e).lower()
+        if "invalid" in err or "wrong" in err or "credentials" in err:
+            return False, "현재 비밀번호가 올바르지 않습니다."
+        return False, f"변경 실패: {e}"
+
+
 # ── OTP 비밀번호 재설정 ──────────────────────────────────────────────────────
 
 def send_reset_otp(email: str) -> tuple[bool, str]:

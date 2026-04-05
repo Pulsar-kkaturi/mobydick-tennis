@@ -97,7 +97,7 @@ with tab_reset:
 
     if not otp_email:
         # 단계 1: 이메일 입력 → OTP 발송
-        st.caption("가입 시 사용한 이메일을 입력하면 6자리 인증 코드를 보내 드립니다.")
+        st.caption("가입 시 사용한 이메일을 입력하면 인증 코드를 보내 드립니다.")
         with st.form("otp_send_form"):
             r_email = st.text_input("이메일")
             send_submitted = st.form_submit_button("인증 코드 받기", type="primary", use_container_width=True)
@@ -110,12 +110,11 @@ with tab_reset:
             else:
                 st.error(msg)
     else:
-        # 단계 2: 6자리 코드 입력 → 검증
-        st.caption(f"**{otp_email}** 로 보낸 6자리 코드를 입력해 주세요.")
+        # 단계 2: 코드 입력 → 검증 (st.form 대신 일반 위젯 사용 → 붙여넣기 가능)
+        st.caption(f"**{otp_email}** 로 보낸 인증 코드를 입력해 주세요.")
         st.caption("코드는 수 분 내에 만료됩니다. 스팸함도 확인해 주세요.")
-        with st.form("otp_verify_form"):
-            otp_code = st.text_input("6자리 인증 코드", max_chars=6, placeholder="123456")
-            verify_submitted = st.form_submit_button("확인", type="primary", use_container_width=True)
+        otp_code = st.text_input("인증 코드", placeholder="이메일로 받은 코드 입력", key="otp_code_input")
+        verify_submitted = st.button("확인", type="primary", use_container_width=True, key="otp_verify_btn")
         if verify_submitted:
             ok, msg = auth.verify_reset_otp(otp_email, otp_code)
             if ok:
