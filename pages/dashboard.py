@@ -71,15 +71,18 @@ else:
         else:
             rows = []
             for i, r in enumerate(season_ranking):
-                detail_str = " | ".join(
-                    f"{tname}: {info['rank']}위 (+{info['pts']})"
-                    for tname, info in r["detail"].items()
-                )
+                detail = r["detail"]
+                gold   = sum(1 for info in detail.values() if info["rank"] == 1)
+                silver = sum(1 for info in detail.values() if info["rank"] == 2)
+                bronze = sum(1 for info in detail.values() if info["rank"] == 3)
                 rows.append({
                     "시즌순위": i + 1,
                     "이름": r["name"],
                     "랭킹포인트": r["points"],
-                    "상세": detail_str,
+                    "🥇": gold,
+                    "🥈": silver,
+                    "🥉": bronze,
+                    "참가 대회": len(detail),
                 })
 
             df = pd.DataFrame(rows)
@@ -131,13 +134,18 @@ with col_main:
                                 st.rerun()
                     with c4:
                         if logged_in:
-                            if st.button("삭제", key=f"del_t_{t['id']}"):
-                                if st.session_state.get(f"confirm_del_{t['id']}"):
-                                    db.delete_tournament(t["id"])
-                                    st.rerun()
-                                else:
-                                    st.session_state[f"confirm_del_{t['id']}"] = True
-                                    st.warning("한 번 더 누르면 삭제됩니다.")
+                            if t.get("is_approved"):
+                                # 승인된 대회는 삭제 불가 — 운영 탭에서 승인 취소 후 삭제
+                                st.button("삭제", key=f"del_t_{t['id']}", disabled=True,
+                                          help="승인된 대회는 삭제할 수 없습니다. 운영 → 대회 승인에서 승인을 취소한 뒤 삭제해 주세요.")
+                            else:
+                                if st.button("삭제", key=f"del_t_{t['id']}"):
+                                    if st.session_state.get(f"confirm_del_{t['id']}"):
+                                        db.delete_tournament(t["id"])
+                                        st.rerun()
+                                    else:
+                                        st.session_state[f"confirm_del_{t['id']}"] = True
+                                        st.warning("한 번 더 누르면 삭제됩니다.")
             if paged_t:
                 db.render_page_nav(tournaments, "dashboard_t_page")
 
