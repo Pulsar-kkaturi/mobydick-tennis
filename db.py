@@ -96,9 +96,16 @@ def get_client() -> Client:
 # ── 대회(Tournament) ──────────────────────────────────────────────────────────
 
 def get_tournaments():
+    """
+    대회 목록. 대회 날짜 최신순(내림차순), 날짜 없음은 맨 아래.
+    동일 날짜·무일자끼리는 created_at 최신순 (대시보드·페이지 selectbox 공통).
+    """
     db = get_client()
     res = db.table("tournaments").select("*").order("created_at", desc=True).execute()
-    return res.data
+    rows = list(res.data or [])
+    rows.sort(key=lambda t: t.get("created_at") or "", reverse=True)
+    rows.sort(key=lambda t: str(t.get("date") or "0000-01-01"), reverse=True)
+    return rows
 
 
 def create_tournament(name: str, date: str, description: str = "", is_legacy: bool = False):

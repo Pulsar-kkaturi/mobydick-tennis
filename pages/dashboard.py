@@ -16,18 +16,7 @@ with col_title:
     st.title("모비딕 테니스")
     st.caption("대회 관리 & 순위 시스템")
 
-tournaments = db.get_tournaments()
-# 대회 목록: 대회 날짜 최신순 (날짜 없음은 맨 아래, 동일 날짜·무일자는 생성일 최신순)
-tournaments = sorted(
-    tournaments,
-    key=lambda t: t.get("created_at") or "",
-    reverse=True,
-)
-tournaments = sorted(
-    tournaments,
-    key=lambda t: str(t.get("date") or "0000-01-01"),
-    reverse=True,
-)
+tournaments = db.get_tournaments()  # 날짜 최신순은 get_tournaments()에서 통일
 
 logged_in = auth.is_logged_in()
 
