@@ -137,17 +137,22 @@ def get_legacy_results(tournament_id: int):
 
 
 def set_legacy_result(tournament_id: int, rank: int, player_name: str):
-    """레거시 대회 특정 순위에 선수 기록 (있으면 덮어씀)"""
+    """레거시 대회 특정 순위에 선수 기록 1명 (단일, 하위 호환용)"""
+    set_legacy_results_for_rank(tournament_id, rank, [player_name])
+
+
+def set_legacy_results_for_rank(tournament_id: int, rank: int, player_names: list):
+    """레거시 대회 특정 순위에 선수 여러 명 저장 (기존 기록 덮어씀)."""
     db = get_client()
-    db.table("legacy_results").upsert({
-        "tournament_id": tournament_id,
-        "rank": rank,
-        "player_name": player_name,
-    }, on_conflict="tournament_id,rank").execute()
+    # 해당 순위 기존 기록 전부 삭제 후 재삽입
+    db.table("legacy_results").delete().eq("tournament_id", tournament_id).eq("rank", rank).execute()
+    if player_names:
+        rows = [{"tournament_id": tournament_id, "rank": rank, "player_name": name} for name in player_names]
+        db.table("legacy_results").insert(rows).execute()
 
 
 def clear_legacy_result(tournament_id: int, rank: int):
-    """레거시 대회 특정 순위 기록 삭제"""
+    """레거시 대회 특정 순위 기록 전체 삭제"""
     db = get_client()
     db.table("legacy_results").delete().eq("tournament_id", tournament_id).eq("rank", rank).execute()
 

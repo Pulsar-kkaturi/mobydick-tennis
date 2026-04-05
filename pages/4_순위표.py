@@ -31,30 +31,34 @@ if tournament.get("is_legacy"):
         lock_reason = "승인된" if tournament.get("is_approved") else "완료 처리된"
         st.warning(f"🔒 {lock_reason} 대회입니다. 순위를 수정할 수 없습니다.")
 
-    # 현재 기록 로드
-    existing = {r["rank"]: r["player_name"] for r in db.get_legacy_results(tid)}
+    # 현재 기록 로드 (순위 → 선수 이름 목록)
+    existing_raw = db.get_legacy_results(tid)
+    existing: dict[int, list[str]] = {}
+    for r in existing_raw:
+        existing.setdefault(r["rank"], []).append(r["player_name"])
 
     if not is_locked:
-        # 전체 선수 풀에서 선택
         all_players = db.get_all_players()
-        player_names = ["(선택 안 함)"] + [p["name"] for p in all_players]
+        all_player_names = [p["name"] for p in all_players]
 
         with st.form("legacy_form"):
-            st.markdown("**순위별 선수 선택**")
+            st.markdown("**순위별 선수 선택 (최대 2명 공동 순위 가능)**")
             rank_labels = {1: "🥇 1위", 2: "🥈 2위", 3: "🥉 3위"}
-            selections = {}
+            selections: dict[int, list[str]] = {}
 
             for rank, label in rank_labels.items():
-                current = existing.get(rank, "(선택 안 함)")
-                default_idx = player_names.index(current) if current in player_names else 0
-                selections[rank] = st.selectbox(label, player_names, index=default_idx, key=f"legacy_rank_{rank}")
+                current = existing.get(rank, [])
+                selections[rank] = st.multiselect(
+                    label,
+                    options=all_player_names,
+                    default=[n for n in current if n in all_player_names],
+                    max_selections=2,
+                    key=f"legacy_rank_{rank}",
+                )
 
             if st.form_submit_button("저장"):
-                for rank, name in selections.items():
-                    if name == "(선택 안 함)":
-                        db.clear_legacy_result(tid, rank)
-                    else:
-                        db.set_legacy_result(tid, rank, name)
+                for rank, names in selections.items():
+                    db.set_legacy_results_for_rank(tid, rank, names)
                 st.success("저장했습니다.")
                 st.rerun()
 
@@ -63,9 +67,14 @@ if tournament.get("is_legacy"):
     if results:
         st.divider()
         st.markdown("**현재 기록**")
+        # 순위별로 그룹핑하여 표시
+        grouped: dict[int, list[str]] = {}
         for r in results:
-            medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(r["rank"], "")
-            st.write(f"{medal} {r['rank']}위 — **{r['player_name']}**")
+            grouped.setdefault(r["rank"], []).append(r["player_name"])
+        for rank in sorted(grouped):
+            medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(rank, "")
+            names_str = " · ".join(f"**{n}**" for n in grouped[rank])
+            st.write(f"{medal} {rank}위 — {names_str}")
     else:
         st.info("아직 기록된 순위가 없습니다.")
 

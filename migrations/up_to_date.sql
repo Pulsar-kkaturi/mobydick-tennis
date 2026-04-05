@@ -48,7 +48,19 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- 3) scoring_config: win_bonus → win_score 키 이름 통일
+-- 3) legacy_results: 공동 순위 지원 — unique(tournament_id, rank) → unique(tournament_id, rank, player_name)
+--    기존 제약 삭제 후 새 제약 추가 (데이터 손실 없음)
+alter table legacy_results
+  drop constraint if exists legacy_results_tournament_id_rank_key;
+
+alter table legacy_results
+  drop constraint if exists legacy_results_tournament_id_rank_player_name_key;
+
+alter table legacy_results
+  add constraint legacy_results_tournament_id_rank_player_name_key
+  unique (tournament_id, rank, player_name);
+
+-- 4) scoring_config: win_bonus → win_score 키 이름 통일
 --    이미 win_score 가 존재하는 대회는 win_bonus 행을 삭제 (중복 방지)
 delete from scoring_config
 where item_key = 'win_bonus'

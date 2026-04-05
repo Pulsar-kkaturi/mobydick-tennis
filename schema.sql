@@ -31,13 +31,13 @@ create table tournaments (
   created_at timestamptz default now()
 );
 
--- 레거시 대회 순위 기록
+-- 레거시 대회 순위 기록 (공동 순위 지원: 같은 rank에 최대 2명)
 create table legacy_results (
   id bigint generated always as identity primary key,
   tournament_id bigint references tournaments(id) on delete cascade,
   rank integer not null,
   player_name text not null,
-  unique(tournament_id, rank)
+  unique(tournament_id, rank, player_name)  -- 같은 순위에 같은 선수 중복 방지
 );
 
 -- 전체 선수 풀
