@@ -183,45 +183,45 @@ with tab_score:
 
     st.divider()
 
-    # ── 항목별 세부 설정 (extra_score 제외) ─────────────────────────────────
-    st.markdown("##### 항목별 세부 설정")
-    st.caption("활성화 체크 후 점수 값을 입력하세요. 저장 버튼으로 확정합니다.")
+    # ── 항목별 세부 설정 (extra_score 제외, 기본 접힘) ───────────────────────
+    with st.expander("항목별 세부 설정", expanded=False):
+        st.caption("활성화 체크 후 점수 값을 입력하세요. 저장 버튼으로 확정합니다.")
 
-    with st.form("scoring_form"):
-        new_values: dict = {}
+        with st.form("scoring_form"):
+            new_values: dict = {}
 
-        for key in SCORE_DISPLAY_ORDER:
-            row = config.get(key)
-            if row is None:
-                continue  # DB에 아직 없으면 건너뜀
-            col1, col2, col3 = st.columns([3, 1, 2])
-            with col1:
-                st.markdown(f"**{row['label']}**")
-            with col2:
-                is_active = st.checkbox(
-                    "활성화",
-                    value=row["is_active"],
-                    key=f"active_{key}",
-                    label_visibility="collapsed",
-                )
-            with col3:
-                score_value = st.number_input(
-                    "점수값",
-                    min_value=-9999,
-                    max_value=9999,
-                    value=row["score_value"],
-                    key=f"val_{key}",
-                    label_visibility="collapsed",
-                )
-            new_values[key] = (is_active, score_value, row["id"])
+            for key in SCORE_DISPLAY_ORDER:
+                row = config.get(key)
+                if row is None:
+                    continue  # DB에 아직 없으면 건너뜀
+                col1, col2, col3 = st.columns([3, 1, 2])
+                with col1:
+                    st.markdown(f"**{row['label']}**")
+                with col2:
+                    is_active = st.checkbox(
+                        "활성화",
+                        value=row["is_active"],
+                        key=f"active_{key}",
+                        label_visibility="collapsed",
+                    )
+                with col3:
+                    score_value = st.number_input(
+                        "점수값",
+                        min_value=-9999,
+                        max_value=9999,
+                        value=row["score_value"],
+                        key=f"val_{key}",
+                        label_visibility="collapsed",
+                    )
+                new_values[key] = (is_active, score_value, row["id"])
 
-        submitted = st.form_submit_button("설정 저장", disabled=is_locked,
-                                          help="완료 또는 승인된 대회는 설정을 변경할 수 없습니다." if is_locked else None)
-        if submitted:
-            for key, (is_active, score_value, config_id) in new_values.items():
-                db.update_scoring_config(config_id, is_active, score_value)
-            st.success("점수 설정을 저장했습니다.")
-            st.rerun()
+            submitted = st.form_submit_button("설정 저장", disabled=is_locked,
+                                              help="완료 또는 승인된 대회는 설정을 변경할 수 없습니다." if is_locked else None)
+            if submitted:
+                for key, (is_active, score_value, config_id) in new_values.items():
+                    db.update_scoring_config(config_id, is_active, score_value)
+                st.success("점수 설정을 저장했습니다.")
+                st.rerun()
 
     st.divider()
 
