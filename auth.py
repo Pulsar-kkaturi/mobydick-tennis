@@ -77,6 +77,7 @@ def signup(full_name: str, email: str, password: str, birth_date) -> tuple[bool,
                     "role": "user",
                     "full_name": name,
                     "birth_date": birth_str,
+                    "email": em,
                 },
                 on_conflict="id",
             ).execute()
@@ -128,6 +129,14 @@ def login(email: str, password: str) -> bool:
         res = client.auth.sign_in_with_password({"email": email, "password": password})
         st.session_state["user"] = res.user
         st.session_state["role"] = _fetch_role(res.user.id)
+        # profiles.email 이 비어 있을 때(구 계정) 운영 화면 표시용으로 동기화
+        try:
+            uid = str(res.user.id)
+            em = (res.user.email or "").strip()
+            if em:
+                client.table("profiles").update({"email": em}).eq("id", uid).execute()
+        except Exception:
+            pass
         return True
     except Exception:
         return False

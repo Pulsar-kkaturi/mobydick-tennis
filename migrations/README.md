@@ -6,10 +6,10 @@
 
 포함 내용:
 
-1. `profiles`에 `full_name`, `birth_date` 컬럼 추가 (없을 때만)
+1. `profiles`에 `full_name`, `birth_date`, `email` 컬럼 추가 (없을 때만) 및 기존 행 이메일 백필(`auth.users` 기준)
 2. `auth.users`에 사용자가 생기면 `profiles` 행을 자동으로 만드는 트리거  
    - 이메일 확인(링크)을 켜도/꺼도 동작에 문제 없음  
-   - 앱 `회원가입`에서 넘기는 `full_name`, `birth_date`가 메타데이터로 들어감
+   - 앱 `회원가입`에서 넘기는 `full_name`, `birth_date`가 메타데이터로 들어감, `email`은 Auth 이메일과 동기
 
 별도로 `01` / `02` 나눠 실행할 필요 **없습니다.**
 

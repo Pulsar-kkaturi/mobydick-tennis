@@ -15,7 +15,8 @@ create table profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   role text not null default 'user',  -- master / admin / user
   full_name text,                       -- 회원가입 시 입력한 이름
-  birth_date date                       -- 생년월일
+  birth_date date,                      -- 생년월일
+  email text                            -- 로그인 이메일 (운영 유저관리 표시용, auth.users 와 동기)
 );
 
 -- 대회 테이블

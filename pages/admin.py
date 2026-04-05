@@ -78,7 +78,7 @@ if is_master and tab_users:
         st.caption("유저 삭제 및 role 변경은 마스터만 가능합니다.")
 
         client = db.get_client()
-        profiles_res = client.table("profiles").select("id, role, full_name, birth_date").execute()
+        profiles_res = client.table("profiles").select("id, role, full_name, birth_date, email").execute()
         profiles = profiles_res.data
 
         ROLE_LABELS = {
@@ -100,7 +100,9 @@ if is_master and tab_users:
                         me = " ← 본인" if current_user and p["id"] == current_user.id else ""
                         nm = p.get("full_name") or "(이름 없음)"
                         bd = p.get("birth_date") or "-"
+                        em = (p.get("email") or "").strip() or "(이메일 없음 — 한 번 로그인하면 채워질 수 있음)"
                         st.markdown(f"**{nm}**{me}")
+                        st.caption(f"이메일: {em}")
                         st.caption(f"생년월일: {bd}")
                         st.code(str(p["id"])[:20] + "...", language=None)
                     with c2:
