@@ -1,10 +1,8 @@
 """
 모비딕 테니스 - 앱 진입점
 - st.navigation()으로 페이지 구조 및 접근 권한 제어
-- 사이드바: 로그인/로그아웃 + 대회 선택
+- 사이드바: 현재 로그인 계정 표시 + 로그인 페이지 링크 / 로그아웃
 """
-import datetime
-
 import streamlit as st
 import auth
 import db
@@ -14,27 +12,6 @@ st.set_page_config(
     page_icon="🎾",
     layout="wide",
 )
-
-# ── 비밀번호 재설정: 메일 링크 → 토큰이 #에만 있으면 서버가 못 읽음 → JS로 쿼리로 이동
-auth.inject_recovery_hash_to_query_redirect()
-auth.try_consume_password_recovery_redirect()
-
-# ── 재설정 세션이 잡힌 뒤: 새 비밀번호 입력 (별도 페이지 파일 없이 여기서만 처리)
-if auth.is_password_recovery_mode():
-    st.title("비밀번호 재설정")
-    st.caption("메일의 링크로 들어온 상태입니다. 아래에 새 비밀번호를 입력해 주세요.")
-    with st.form("password_recovery_form"):
-        npw = st.text_input("새 비밀번호", type="password")
-        npw2 = st.text_input("새 비밀번호 확인", type="password")
-        submitted = st.form_submit_button("비밀번호 변경", type="primary")
-    if submitted:
-        ok_pw, msg_pw = auth.submit_new_password_after_recovery(npw, npw2)
-        if ok_pw:
-            st.success(msg_pw)
-            st.rerun()
-        else:
-            st.error(msg_pw)
-    st.stop()
 
 # ── 회원가입 직후 안내 (한 번만 뜨는 다이얼로그) ───────────────────────────────
 _popup = st.session_state.pop("signup_popup_payload", None)
@@ -51,7 +28,7 @@ if _popup:
 
     _signup_done_dialog()
 
-# ── 사이드바: 로그인/로그아웃 ─────────────────────────────────────────────────
+# ── 사이드바: 로그인 계정 표시 / 로그인 버튼 / 로그아웃 ───────────────────────
 with st.sidebar:
     user = auth.get_user()
 
@@ -61,63 +38,8 @@ with st.sidebar:
             auth.logout()
             st.rerun()
     else:
-        with st.expander("🔐 로그인 / 회원가입", expanded=False):
-            tab_login, tab_signup = st.tabs(["로그인", "회원가입"])
-
-            with tab_login:
-                # st.form: 비밀번호 칸에서 Enter 누르면 로그인 버튼과 동일하게 제출됨
-                with st.form("sidebar_login_form", border=False):
-                    email = st.text_input("이메일", key="login_email")
-                    password = st.text_input("비밀번호", type="password", key="login_pw")
-                    login_submitted = st.form_submit_button("로그인", use_container_width=True)
-                if login_submitted:
-                    if auth.login(email, password):
-                        st.rerun()
-                    else:
-                        st.error("이메일 또는 비밀번호가 틀렸습니다.")
-
-                with st.expander("비밀번호를 잊으셨나요?", expanded=False):
-                    st.caption("가입 시 사용한 이메일로 재설정 링크를 보냅니다.")
-                    with st.form("sidebar_reset_pw_form", border=False):
-                        re_email = st.text_input("이메일", key="reset_pw_email")
-                        reset_submitted = st.form_submit_button("재설정 메일 보내기")
-                    if reset_submitted:
-                        ok_r, msg_r = auth.send_password_reset_email(re_email)
-                        if ok_r:
-                            st.success(msg_r)
-                        else:
-                            st.error(msg_r)
-
-            with tab_signup:
-                st.caption("영문+숫자 조합 8자 이상 비밀번호")
-                with st.form("sidebar_signup_form", border=False):
-                    su_name = st.text_input("이름", key="su_name")
-                    su_email = st.text_input("이메일 (로그인 ID)", key="su_email")
-                    su_pw = st.text_input("비밀번호", type="password", key="su_pw")
-                    su_pw2 = st.text_input("비밀번호 확인", type="password", key="su_pw2")
-                    su_birth = st.date_input(
-                        "생년월일",
-                        min_value=datetime.date(1920, 1, 1),
-                        max_value=datetime.date.today(),
-                        value=None,
-                        key="su_birth",
-                    )
-                    signup_submitted = st.form_submit_button("회원가입", use_container_width=True)
-
-                if signup_submitted:
-                    if su_pw != su_pw2:
-                        st.error("비밀번호 확인이 일치하지 않습니다.")
-                    else:
-                        ok, msg = auth.signup(su_name, su_email, su_pw, su_birth)
-                        if ok:
-                            st.session_state["signup_popup_payload"] = {
-                                "name": su_name.strip(),
-                                "email": su_email.strip(),
-                                "detail": msg,
-                            }
-                            st.rerun()
-                        else:
-                            st.error(msg)
+        if st.button("🔐 로그인 / 회원가입", use_container_width=True, type="primary"):
+            st.switch_page("pages/0_로그인.py")
 
     st.divider()
 
@@ -126,7 +48,6 @@ with st.sidebar:
     if tournaments:
         t_names = [t["name"] for t in tournaments]
 
-        # 이전에 선택한 대회 유지
         prev = st.session_state.get("selected_tournament_name")
         default_idx = t_names.index(prev) if prev in t_names else 0
 
@@ -140,35 +61,39 @@ with st.sidebar:
         st.caption("대회가 없습니다. 대시보드에서 생성해 주세요.")
 
 # ── 페이지 정의 ───────────────────────────────────────────────────────────────
-dashboard  = st.Page("pages/dashboard.py",   title="대시보드",  icon="🏠", default=True)
-ranking    = st.Page("pages/4_순위표.py",    title="순위표",    icon="🏆")
-stats      = st.Page("pages/5_통계.py",      title="통계",      icon="📊")
+login_page  = st.Page("pages/0_로그인.py",      title="로그인",    icon="🔐")
+dashboard   = st.Page("pages/dashboard.py",     title="대시보드",  icon="🏠", default=True)
+ranking     = st.Page("pages/4_순위표.py",      title="순위표",    icon="🏆")
+stats       = st.Page("pages/5_통계.py",        title="통계",      icon="📊")
 
-players    = st.Page("pages/1_선수관리.py",  title="선수관리",  icon="👥")
-t_settings = st.Page("pages/6_대회설정.py", title="대회설정",  icon="⚙️")
-bracket    = st.Page("pages/2_대진표.py",    title="대진표",    icon="📋")
-match_in   = st.Page("pages/3_경기입력.py", title="경기입력",  icon="✏️")
+players     = st.Page("pages/1_선수관리.py",    title="선수관리",  icon="👥")
+t_settings  = st.Page("pages/6_대회설정.py",   title="대회설정",  icon="⚙️")
+bracket     = st.Page("pages/2_대진표.py",      title="대진표",    icon="📋")
+match_in    = st.Page("pages/3_경기입력.py",    title="경기입력",  icon="✏️")
 
-admin_page = st.Page("pages/admin.py",       title="운영",      icon="🛡️")
+admin_page  = st.Page("pages/admin.py",         title="운영",      icon="🛡️")
 
 # ── role에 따라 네비게이션 구성 ───────────────────────────────────────────────
 if auth.is_admin():
-    # 마스터 & 관리자: 운영탭 포함 (탭 내부 권한은 admin.py에서 분기)
     nav = st.navigation({
         "": [dashboard, ranking, stats],
         "관리": [players],
         "대회관리": [t_settings, bracket, match_in],
         "운영": [admin_page],
+        "계정": [login_page],
     })
 elif auth.is_user():
-    # 일반 유저: 대회/선수 관리 가능, 운영탭 없음
     nav = st.navigation({
         "": [dashboard, ranking, stats],
         "관리": [players],
         "대회관리": [t_settings, bracket, match_in],
+        "계정": [login_page],
     })
 else:
-    # 게스트: 조회만
-    nav = st.navigation([dashboard, ranking, stats])
+    # 게스트: 로그인 페이지 + 조회만
+    nav = st.navigation({
+        "": [dashboard, ranking, stats],
+        "계정": [login_page],
+    })
 
 nav.run()
