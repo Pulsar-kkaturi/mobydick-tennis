@@ -8,8 +8,131 @@ role 계층:
   None    — 게스트 (조회만)
 """
 import re
+
 import streamlit as st
+import streamlit.components.v1 as components
 import db
+
+
+def _qp_first(qp, key: str) -> str | None:
+    """st.query_params 값이 문자열 또는 리스트일 때 첫 문자열만 꺼냄."""
+    v = qp.get(key)
+    if v is None:
+        return None
+    if isinstance(v, (list, tuple)):
+        return str(v[0]) if v else None
+    return str(v)
+
+
+def inject_recovery_hash_to_query_redirect():
+    """
+    비밀번호 재설정 메일 링크는 브라우저 주소가
+      https://앱/#access_token=...&refresh_token=...&type=recovery
+    처럼 오는 경우가 많다. # 뒤(해시)는 HTTP 요청에 안 실리므로 Streamlit(파이썬)이 못 읽는다.
+    그래서 짧은 JS로 한 번만 같은 경로에 ?access_token=... 형태로 바꿔 열게 한다.
+    (PKCE 로 ?code= 만 오는 경우는 파이썬에서 그대로 처리)
+    """
+    components.html(
+        """
+<script>
+(function () {
+  var h = window.location.hash;
+  if (!h || h.length < 2) return;
+  var s = h.substring(1);
+  if (s.indexOf("access_token") === -1 && s.indexOf("type=recovery") === -1) return;
+  var path = window.location.pathname;
+  var search = window.location.search || "";
+  var join = search ? "&" : "?";
+  window.location.replace(window.location.origin + path + search + join + s);
+})();
+</script>
+        """,
+        height=0,
+        width=0,
+    )
+
+
+def _sync_session_state_from_supabase_client(client) -> None:
+    """Supabase 클라이언트에 잡힌 세션을 앱이 쓰는 session_state 와 맞춤."""
+    gu = client.auth.get_user()
+    if gu and getattr(gu, "user", None):
+        uid = str(gu.user.id)
+        st.session_state["user"] = gu.user
+        st.session_state["role"] = _fetch_role(uid)
+
+
+def _strip_oauth_query_params() -> None:
+    """주소창에서 토큰·code 가 남지 않게 제거(히스토리/공유 시 노출 방지)."""
+    qp = st.query_params
+    drop = frozenset(
+        ("access_token", "refresh_token", "type", "expires_in", "token_type", "code", "scope", "state")
+    )
+    for k in list(qp.keys()):
+        if k in drop:
+            del qp[k]
+
+
+def try_consume_password_recovery_redirect() -> None:
+    """
+    URL 쿼리에 recovery 토큰 또는 PKCE code 가 있으면 세션으로 바꾼 뒤
+    password_recovery_mode 를 켠다. 이후 app.py 에서 새 비밀번호 폼을 보여 준다.
+    """
+    qp = st.query_params
+    at = _qp_first(qp, "access_token")
+    rt = _qp_first(qp, "refresh_token")
+    tp = (_qp_first(qp, "type") or "").lower()
+
+    client = db.get_client()
+
+    # 해시→쿼리로 넘어온 implicit 형태 (토큰 + type=recovery)
+    # 참고: ?code= 만 오는 PKCE 는 code_verifier 가 브라우저에 있어야 해서
+    # Streamlit 파이썬만으로는 교환 불가. 이 경우 Supabase 쪽이 해시 토큰으로 오게 하는 설정을 쓰는 편이 낫다.
+    if at and rt and tp == "recovery":
+        try:
+            client.auth.set_session(access_token=at, refresh_token=rt)
+            _sync_session_state_from_supabase_client(client)
+            st.session_state["password_recovery_mode"] = True
+            _strip_oauth_query_params()
+            st.rerun()
+        except Exception as e:
+            st.error(f"재설정 링크 처리에 실패했습니다. 링크가 만료됐을 수 있습니다. ({e})")
+
+
+def is_password_recovery_mode() -> bool:
+    return bool(st.session_state.get("password_recovery_mode"))
+
+
+def submit_new_password_after_recovery(password: str, password_confirm: str) -> tuple[bool, str]:
+    """
+    recovery 세션으로 로그인된 상태에서만 호출.
+    Supabase 규칙: update_user({"password"}) 전에 세션이 있어야 함.
+    """
+    if password != password_confirm:
+        return False, "비밀번호 확인이 일치하지 않습니다."
+    ok, msg = validate_signup_password(password)
+    if not ok:
+        return False, msg
+    if not st.session_state.get("password_recovery_mode"):
+        return False, "재설정 세션이 없습니다. 메일의 링크를 다시 열어 주세요."
+
+    try:
+        client = db.get_client()
+        client.auth.update_user({"password": password})
+        st.session_state.pop("password_recovery_mode", None)
+        _sync_session_state_from_supabase_client(client)
+        # profiles.email 동기화 (로그인 플로우와 동일)
+        try:
+            u = st.session_state.get("user")
+            if u and getattr(u, "email", None):
+                uid = str(u.id)
+                em = (u.email or "").strip()
+                if em:
+                    client.table("profiles").update({"email": em}).eq("id", uid).execute()
+        except Exception:
+            pass
+        return True, "비밀번호가 변경되었습니다. 이제 그대로 이용하시면 됩니다."
+    except Exception as e:
+        return False, f"변경 실패: {e}"
 
 
 def validate_signup_password(password: str) -> tuple[bool, str]:
@@ -149,6 +272,7 @@ def logout():
         pass
     st.session_state.pop("user", None)
     st.session_state.pop("role", None)
+    st.session_state.pop("password_recovery_mode", None)
 
 
 def get_user():

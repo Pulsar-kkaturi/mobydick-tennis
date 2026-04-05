@@ -15,6 +15,27 @@ st.set_page_config(
     layout="wide",
 )
 
+# ── 비밀번호 재설정: 메일 링크 → 토큰이 #에만 있으면 서버가 못 읽음 → JS로 쿼리로 이동
+auth.inject_recovery_hash_to_query_redirect()
+auth.try_consume_password_recovery_redirect()
+
+# ── 재설정 세션이 잡힌 뒤: 새 비밀번호 입력 (별도 페이지 파일 없이 여기서만 처리)
+if auth.is_password_recovery_mode():
+    st.title("비밀번호 재설정")
+    st.caption("메일의 링크로 들어온 상태입니다. 아래에 새 비밀번호를 입력해 주세요.")
+    with st.form("password_recovery_form"):
+        npw = st.text_input("새 비밀번호", type="password")
+        npw2 = st.text_input("새 비밀번호 확인", type="password")
+        submitted = st.form_submit_button("비밀번호 변경", type="primary")
+    if submitted:
+        ok_pw, msg_pw = auth.submit_new_password_after_recovery(npw, npw2)
+        if ok_pw:
+            st.success(msg_pw)
+            st.rerun()
+        else:
+            st.error(msg_pw)
+    st.stop()
+
 # ── 회원가입 직후 안내 (한 번만 뜨는 다이얼로그) ───────────────────────────────
 _popup = st.session_state.pop("signup_popup_payload", None)
 if _popup:

@@ -25,7 +25,8 @@ Streamlit + Supabase 기반으로 만들어졌으며, Streamlit Cloud를 통해 
 ### 비밀번호를 잊었을 때 (선택지 3가지)
 
 **1) 앱에서 재설정 메일 (이미 구현됨)**  
-로그인 탭 → **비밀번호를 잊으셨나요?** → 이메일 입력 → 메일로 온 **링크**에서 새 비밀번호 설정 (6자리 숫자 입력 방식이 아님).  
+로그인 탭 → **비밀번호를 잊으셨나요?** → 이메일 입력 → 메일 링크 클릭 → **앱에「비밀번호 재설정」화면**이 뜨면 새 비밀번호를 입력·저장 (6자리 숫자 방식 아님).  
+`PASSWORD_RESET_REDIRECT_URL` 은 **어느 주소로 브라우저를 열지**만 정하고, 그 다음 화면은 앱(`app.py` + `auth.py`)에서 처리합니다. 메일 링크에 토큰이 `#access_token=...` 처럼 붙는 경우가 많아, 앱이 짧은 스크립트로 한 번 `#` 를 `?` 쿼리로 바꿔 토큰을 읽습니다.  
 Supabase **Authentication → URL Configuration** 에서 **Site URL** 과 **Redirect URLs** 에 배포 주소(예: `https://xxx.streamlit.app`)를 넣어 두세요.  
 선택으로 `secrets.toml` / Streamlit Secrets에 다음을 넣으면 재설정 후 돌아올 주소를 지정할 수 있습니다.
 
