@@ -7,14 +7,35 @@ role 계층:
   user    — 대회/선수 관리 가능, 승인 불가
   None    — 게스트 (조회만)
 """
+import base64
+import json
 import re
+from typing import Optional
 
 import streamlit as st
 import streamlit.components.v1 as components
 import db
 
 
-def _qp_first(qp, key: str) -> str | None:
+def _jwt_amr_includes_recovery(access_token: str) -> bool:
+    """
+    재설정용 access_token JWT payload 의 amr 에 'recovery' 가 들어가는 경우가 많다.
+    (서명 검증 없이 디코드만 — 링크 조작 방지는 set_session 시 Supabase 가 판별)
+    """
+    try:
+        parts = access_token.split(".")
+        if len(parts) < 2:
+            return False
+        b64 = parts[1]
+        pad = "=" * (-len(b64) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(b64 + pad).decode("utf-8"))
+        amr = payload.get("amr")
+        return isinstance(amr, list) and "recovery" in amr
+    except Exception:
+        return False
+
+
+def _qp_first(qp, key: str) -> Optional[str]:
     """st.query_params 값이 문자열 또는 리스트일 때 첫 문자열만 꺼냄."""
     v = qp.get(key)
     if v is None:
@@ -29,26 +50,39 @@ def inject_recovery_hash_to_query_redirect():
     비밀번호 재설정 메일 링크는 브라우저 주소가
       https://앱/#access_token=...&refresh_token=...&type=recovery
     처럼 오는 경우가 많다. # 뒤(해시)는 HTTP 요청에 안 실리므로 Streamlit(파이썬)이 못 읽는다.
-    그래서 짧은 JS로 한 번만 같은 경로에 ?access_token=... 형태로 바꿔 열게 한다.
-    (PKCE 로 ?code= 만 오는 경우는 파이썬에서 그대로 처리)
+
+    주의: st.components.html 은 iframe 안에서 실행된다. iframe 의 window.location 에는
+    해시가 없으므로, 반드시 window.top (또는 parent) 의 location 을 봐야 한다.
     """
     components.html(
         """
 <script>
 (function () {
-  var h = window.location.hash;
+  function pageLocation() {
+    try {
+      if (window.top && window.top.location) return window.top.location;
+    } catch (e) {}
+    try {
+      if (window.parent && window.parent.location) return window.parent.location;
+    } catch (e) {}
+    return window.location;
+  }
+  var loc = pageLocation();
+  var h = loc.hash;
   if (!h || h.length < 2) return;
   var s = h.substring(1);
-  if (s.indexOf("access_token") === -1 && s.indexOf("type=recovery") === -1) return;
-  var path = window.location.pathname;
-  var search = window.location.search || "";
+  // 재설정 플로우만 옮김 (일반 OAuth implicit 과 섞이면 안 됨)
+  if (s.indexOf("access_token") === -1) return;
+  if (s.indexOf("type=recovery") === -1 && s.indexOf("type%3Drecovery") === -1) return;
+  var path = loc.pathname;
+  var search = loc.search || "";
   var join = search ? "&" : "?";
-  window.location.replace(window.location.origin + path + search + join + s);
+  loc.replace(loc.origin + path + search + join + s);
 })();
 </script>
         """,
-        height=0,
-        width=0,
+        height=1,
+        width=1,
     )
 
 
@@ -84,13 +118,20 @@ def try_consume_password_recovery_redirect() -> None:
 
     client = db.get_client()
 
-    # 해시→쿼리로 넘어온 implicit 형태 (토큰 + type=recovery)
+    # 해시→쿼리로 넘어온 implicit 형태 (type=recovery 또는 JWT amr 에 recovery)
     # 참고: ?code= 만 오는 PKCE 는 code_verifier 가 브라우저에 있어야 해서
     # Streamlit 파이썬만으로는 교환 불가. 이 경우 Supabase 쪽이 해시 토큰으로 오게 하는 설정을 쓰는 편이 낫다.
-    if at and rt and tp == "recovery":
+    is_recovery = tp == "recovery" or _jwt_amr_includes_recovery(at or "")
+    if at and rt and is_recovery:
         try:
-            client.auth.set_session(access_token=at, refresh_token=rt)
-            _sync_session_state_from_supabase_client(client)
+            resp = client.auth.set_session(access_token=at, refresh_token=rt)
+            # get_user() 가 비는 경우가 있어 set_session 응답을 우선 사용
+            u = getattr(resp, "user", None) if resp is not None else None
+            if u is not None:
+                st.session_state["user"] = u
+                st.session_state["role"] = _fetch_role(str(u.id))
+            else:
+                _sync_session_state_from_supabase_client(client)
             st.session_state["password_recovery_mode"] = True
             _strip_oauth_query_params()
             st.rerun()
@@ -279,7 +320,7 @@ def get_user():
     return st.session_state.get("user")
 
 
-def get_role() -> str | None:
+def get_role() -> Optional[str]:
     return st.session_state.get("role")
 
 
