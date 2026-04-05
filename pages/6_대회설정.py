@@ -128,11 +128,30 @@ with tab_assign:
 # ════════════════════════════════════════════════════════════════════════════════
 # 탭 2: 점수 설정
 # ════════════════════════════════════════════════════════════════════════════════
+
+# UI에 표시할 항목 순서 (extra_score는 DB는 유지하되 UI에서 숨김)
+SCORE_DISPLAY_ORDER = [
+    "win_score", "draw_score", "loss_score", "play_bonus",
+    "score_diff", "wc_self_bonus", "wc_partner_bonus",
+]
+
+# 공식 미리보기용 문구 맵
+SCORE_FORMULA_LABEL = {
+    "win_score":        "승리 × {v}",
+    "draw_score":       "무승부 × {v}",
+    "loss_score":       "패배 × {v}",
+    "play_bonus":       "경기 참여 × {v}",
+    "score_diff":       "게임득실차 × {v}",
+    "wc_self_bonus":    "WC 본인 {v}점/경기",
+    "wc_partner_bonus": "WC파트너 승리 시 {v}점",
+}
+
 with tab_score:
     st.subheader("점수 설정")
 
     config = db.get_scoring_config(tid)
 
+    # ── 프리셋 ──────────────────────────────────────────────────────────────
     st.markdown("##### 프리셋으로 빠르게 변경")
     preset_names = list(PRESETS.keys())
     selected_preset = st.selectbox("프리셋 선택", ["(직접 설정)"] + preset_names, key="preset_pick")
@@ -148,13 +167,17 @@ with tab_score:
 
     st.divider()
 
+    # ── 항목별 세부 설정 (extra_score 제외) ─────────────────────────────────
     st.markdown("##### 항목별 세부 설정")
-    st.caption("프리셋 적용 후 수치를 직접 조정할 수 있습니다. 변경 후 저장 버튼을 눌러주세요.")
+    st.caption("활성화 체크 후 점수 값을 입력하세요. 저장 버튼으로 확정합니다.")
 
     with st.form("scoring_form"):
-        new_values: dict[str, tuple] = {}
+        new_values: dict = {}
 
-        for key, row in config.items():
+        for key in SCORE_DISPLAY_ORDER:
+            row = config.get(key)
+            if row is None:
+                continue  # DB에 아직 없으면 건너뜀
             col1, col2, col3 = st.columns([3, 1, 2])
             with col1:
                 st.markdown(f"**{row['label']}**")
@@ -183,25 +206,18 @@ with tab_score:
             st.rerun()
 
     st.divider()
+
+    # ── 공식 미리보기 ─────────────────────────────────────────────────────
     st.markdown("##### 현재 점수 계산 공식 미리보기")
     config = db.get_scoring_config(tid)
 
     parts = []
-    for key, row in config.items():
-        if not row["is_active"]:
+    for key in SCORE_DISPLAY_ORDER:
+        row = config.get(key)
+        if not row or not row["is_active"]:
             continue
-        if key == "win_bonus":
-            parts.append(f"승리수 × {row['score_value']}")
-        elif key == "play_bonus":
-            parts.append(f"경기수 × {row['score_value']}")
-        elif key == "score_diff":
-            parts.append(f"득실차 × {row['score_value']}")
-        elif key == "wc_self_bonus":
-            parts.append(f"WC선수 보너스 {row['score_value']}점/경기")
-        elif key == "wc_partner_bonus":
-            parts.append(f"WC파트너 승리 시 {row['score_value']}점")
-        elif key == "extra_score":
-            parts.append("추가 점수")
+        tmpl = SCORE_FORMULA_LABEL.get(key, key)
+        parts.append(tmpl.format(v=row["score_value"]))
 
     if parts:
         st.code("총점 = " + " + ".join(parts), language=None)

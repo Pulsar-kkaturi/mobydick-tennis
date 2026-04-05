@@ -47,3 +47,27 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- 3) scoring_config: win_bonus → win_score 키 이름 통일
+--    레거시 데이터의 item_key를 win_score 로 일괄 변경
+update scoring_config
+set item_key = 'win_score', label = '승리'
+where item_key = 'win_bonus';
+
+-- 4) scoring_config 에 draw_score / loss_score 항목 추가
+--    기존 대회에 항목이 없는 경우에만 삽입 (중복 방지)
+insert into scoring_config (tournament_id, item_key, label, is_active, score_value)
+select t.id, 'draw_score', '무승부', false, 0
+from tournaments t
+where not exists (
+    select 1 from scoring_config sc
+    where sc.tournament_id = t.id and sc.item_key = 'draw_score'
+);
+
+insert into scoring_config (tournament_id, item_key, label, is_active, score_value)
+select t.id, 'loss_score', '패배', false, 0
+from tournaments t
+where not exists (
+    select 1 from scoring_config sc
+    where sc.tournament_id = t.id and sc.item_key = 'loss_score'
+);

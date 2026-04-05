@@ -8,34 +8,35 @@
 # 각 프리셋은 scoring_config의 item_key별로 (is_active, score_value) 를 덮어씀
 
 PRESETS = {
-    "현재 방식 (엑셀 기준)": {
-        "win_bonus":        (True,  100),
-        "play_bonus":       (True,  10),
-        "score_diff":       (True,  1),
-        "wc_self_bonus":    (True,  30),
-        "wc_partner_bonus": (True,  5),
-        "extra_score":      (True,  0),
-    },
-    "승리수만": {
-        "win_bonus":        (True,  1),
+    # 승리만 카운트 (win_score 1점)
+    "승률": {
+        "win_score":        (True,  1),
+        "draw_score":       (False, 0),
+        "loss_score":       (False, 0),
         "play_bonus":       (False, 0),
         "score_diff":       (False, 0),
         "wc_self_bonus":    (False, 0),
         "wc_partner_bonus": (False, 0),
         "extra_score":      (False, 0),
     },
-    "득실차 포함": {
-        "win_bonus":        (True,  100),
+    # 축구식 승점제: 승=3, 무=1, 패=0
+    "승점제": {
+        "win_score":        (True,  3),
+        "draw_score":       (True,  1),
+        "loss_score":       (False, 0),
         "play_bonus":       (False, 0),
-        "score_diff":       (True,  1),
+        "score_diff":       (False, 0),
         "wc_self_bonus":    (False, 0),
         "wc_partner_bonus": (False, 0),
         "extra_score":      (False, 0),
     },
-    "승점제 (승3/무1/패0)": {
-        "win_bonus":        (True,  3),   # 승리 시 3점
-        "play_bonus":       (True,  1),   # 무승부 시 1점 (참여=무승부로 활용)
-        "score_diff":       (False, 0),
+    # 게임 득실차만 반영
+    "득실차": {
+        "win_score":        (False, 0),
+        "draw_score":       (False, 0),
+        "loss_score":       (False, 0),
+        "play_bonus":       (False, 0),
+        "score_diff":       (True,  1),
         "wc_self_bonus":    (False, 0),
         "wc_partner_bonus": (False, 0),
         "extra_score":      (False, 0),
@@ -70,7 +71,9 @@ def calculate_standings(players: list, matches: list, config: dict, extra_scores
             return 0
         return c.get("score_value", 0)
 
-    win_pt    = cfg("win_bonus")
+    win_pt    = cfg("win_score")
+    draw_pt   = cfg("draw_score")   # 무승부 점수 (기본 off)
+    loss_pt   = cfg("loss_score")   # 패배 점수 (기본 off)
     play_pt   = cfg("play_bonus")
     diff_pt   = cfg("score_diff")
     wc_self   = cfg("wc_self_bonus")
@@ -86,6 +89,8 @@ def calculate_standings(players: list, matches: list, config: dict, extra_scores
     stats = {p["name"]: {
         "name": p["name"],
         "wins": 0,
+        "draws": 0,
+        "losses": 0,
         "played": 0,
         "score_diff": 0,
         "wc_bonus": 0,
@@ -106,11 +111,12 @@ def calculate_standings(players: list, matches: list, config: dict, extra_scores
 
         team1_won = s1 > s2
         team2_won = s2 > s1
+        is_draw   = s1 == s2  # 동점이면 무승부
 
         # 팀별로 통계 업데이트
-        for team, opponents, won, my_score, opp_score in [
-            (t1, t2, team1_won, s1, s2),
-            (t2, t1, team2_won, s2, s1),
+        for team, won, my_score, opp_score in [
+            (t1, team1_won, s1, s2),
+            (t2, team2_won, s2, s1),
         ]:
             for player in team:
                 if player not in stats:
@@ -118,16 +124,18 @@ def calculate_standings(players: list, matches: list, config: dict, extra_scores
                 stats[player]["played"] += 1
                 stats[player]["score_diff"] += (my_score - opp_score)
 
-                if won:
+                if is_draw:
+                    stats[player]["draws"] += 1
+                elif won:
                     stats[player]["wins"] += 1
-
                     # WC 파트너 보너스: 같은 팀에 WC가 있고 이겼을 때 팀원 모두에게
                     team_has_wc = any(wc_map.get(p, False) for p in team)
                     if team_has_wc:
                         stats[player]["partner_bonus"] += wc_part
+                else:
+                    stats[player]["losses"] += 1
 
-            # WC 본인 보너스: WC 선수가 포함된 경기에서 (승패 무관하게 1회만)
-            # 단, 경기 참여마다 주는 게 아니라 경기당 1회
+            # WC 본인 보너스: WC 선수가 포함된 경기에서 경기당 1회 (승패 무관)
             for player in team:
                 if wc_map.get(player, False):
                     stats[player]["wc_bonus"] += wc_self
@@ -138,6 +146,8 @@ def calculate_standings(players: list, matches: list, config: dict, extra_scores
         extra = extra_map.get(name, 0) if extra_on else 0
         total = (
             s["wins"]         * win_pt
+            + s["draws"]      * draw_pt
+            + s["losses"]     * loss_pt
             + s["played"]     * play_pt
             + s["score_diff"] * diff_pt
             + s["wc_bonus"]

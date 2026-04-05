@@ -86,6 +86,16 @@ create table extra_scores (
 );
 
 -- 점수 설정 (대회별)
+-- 앱이 대회 최초 조회 시 DEFAULT_SCORING_CONFIG(db.py) 기준으로 자동 삽입
+-- 표준 item_key 목록:
+--   win_score        승리
+--   draw_score       무승부
+--   loss_score       패배
+--   play_bonus       경기 참여
+--   score_diff       게임 득실차
+--   wc_self_bonus    WC 본인 보너스
+--   wc_partner_bonus WC 파트너 보너스 (승리 시)
+--   extra_score      추가 점수 (경기입력 페이지에서 입력, 점수설정 UI에서는 숨김)
 create table scoring_config (
   id bigint generated always as identity primary key,
   tournament_id bigint references tournaments(id) on delete cascade,

@@ -292,24 +292,37 @@ def delete_extra_score(score_id: int):
 # ── 점수 설정(Scoring Config) ─────────────────────────────────────────────────
 
 DEFAULT_SCORING_CONFIG = [
-    {"item_key": "win_bonus",        "label": "경기 승리 보너스",          "is_active": True,  "score_value": 100},
-    {"item_key": "play_bonus",       "label": "경기 참여 점수",            "is_active": True,  "score_value": 10},
-    {"item_key": "score_diff",       "label": "게임 득실차",               "is_active": True,  "score_value": 1},
-    {"item_key": "wc_self_bonus",    "label": "WC 본인 보너스",            "is_active": True,  "score_value": 30},
-    {"item_key": "wc_partner_bonus", "label": "WC 파트너 보너스 (승리 시)", "is_active": True,  "score_value": 5},
-    {"item_key": "extra_score",      "label": "추가 점수 (토너먼트 등)",    "is_active": True,  "score_value": 0},
+    {"item_key": "win_score",        "label": "승리",                      "is_active": True,  "score_value": 1},
+    {"item_key": "draw_score",       "label": "무승부",                    "is_active": False, "score_value": 0},
+    {"item_key": "loss_score",       "label": "패배",                      "is_active": False, "score_value": 0},
+    {"item_key": "play_bonus",       "label": "경기 참여",                  "is_active": False, "score_value": 0},
+    {"item_key": "score_diff",       "label": "게임 득실차",                "is_active": False, "score_value": 1},
+    {"item_key": "wc_self_bonus",    "label": "WC 본인 보너스",             "is_active": False, "score_value": 0},
+    {"item_key": "wc_partner_bonus", "label": "WC 파트너 보너스 (승리 시)", "is_active": False, "score_value": 0},
+    {"item_key": "extra_score",      "label": "추가 점수",                  "is_active": False, "score_value": 0},
 ]
 
 
 def get_scoring_config(tournament_id: int):
+    """
+    대회별 점수 설정 로드.
+    항목이 없으면 기본값으로 생성, 일부만 없으면 해당 항목만 추가 (신규 item_key 대응).
+    """
     db = get_client()
     res = db.table("scoring_config").select("*").eq("tournament_id", tournament_id).execute()
+    existing_keys = {row["item_key"] for row in res.data}
 
-    if not res.data:
+    if not existing_keys:
         rows = [{**item, "tournament_id": tournament_id} for item in DEFAULT_SCORING_CONFIG]
         db.table("scoring_config").insert(rows).execute()
-        res = db.table("scoring_config").select("*").eq("tournament_id", tournament_id).execute()
+    else:
+        # 새로 추가된 항목(draw_score, loss_score 등)이 기존 대회에 없으면 삽입
+        missing = [item for item in DEFAULT_SCORING_CONFIG if item["item_key"] not in existing_keys]
+        if missing:
+            rows = [{**item, "tournament_id": tournament_id} for item in missing]
+            db.table("scoring_config").insert(rows).execute()
 
+    res = db.table("scoring_config").select("*").eq("tournament_id", tournament_id).execute()
     return {row["item_key"]: row for row in res.data}
 
 
