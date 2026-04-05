@@ -2,7 +2,7 @@
 대회설정 페이지
 
 탭:
-- 선수 배정: 대회에 선수 풀에서 배정·직함·WC (기존 선수관리의 대회별 배정)
+- 선수 배정: 대회에 선수 풀에서 배정·WC
 - 점수 설정: 프리셋·항목별 점수
 """
 import streamlit as st
@@ -43,28 +43,38 @@ with tab_assign:
         with st.expander(f"배정된 선수 ({len(assigned)}명)", expanded=True):
             page_assigned, paged_a = db.get_page_slice(assigned, "assign_list_page")
             all_pool = db.get_all_players()
+            h1, h2, h3, h4, h5, h6 = st.columns([2, 1, 2, 1, 0.8, 1])
+            with h1:
+                st.caption("**이름**")
+            with h2:
+                st.caption("**성별**")
+            with h3:
+                st.caption("**플레이 스타일**")
+            with h4:
+                st.caption("**WC**")
+            with h5:
+                st.caption("")
+            with h6:
+                st.caption("")
             for p in page_assigned:
-                col1, col2, col3, col4, col5 = st.columns([2, 1, 2, 1, 1])
+                player_info = next((pl for pl in all_pool if pl["id"] == p["player_id"]), {})
+                col1, col2, col3, col4, col5, col6 = st.columns([2, 1, 2, 1, 0.8, 1])
                 with col1:
                     st.write(f"**{p['name']}**")
                 with col2:
-                    st.caption(p.get("title") or "-")
+                    st.caption(player_info.get("gender") or "—")
                 with col3:
-                    player_info = next((pl for pl in all_pool if pl["id"] == p["player_id"]), {})
-                    info_str = " | ".join(filter(None, [player_info.get("gender"), player_info.get("play_style")]))
-                    st.caption(info_str or "-")
+                    st.caption(player_info.get("play_style") or "—")
                 with col4:
                     st.caption("🃏 WC" if p["is_wildcard"] else "")
                 with col5:
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        if st.button("수정", key=f"edit_tp_{p['id']}"):
-                            st.session_state["editing_tp"] = p
-                    with c2:
-                        if st.button("제거", key=f"rem_tp_{p['id']}"):
-                            db.remove_player_from_tournament(p["id"])
-                            st.session_state.pop("editing_tp", None)
-                            st.rerun()
+                    if st.button("수정", key=f"edit_tp_{p['id']}"):
+                        st.session_state["editing_tp"] = p
+                with col6:
+                    if st.button("제거", key=f"rem_tp_{p['id']}"):
+                        db.remove_player_from_tournament(p["id"])
+                        st.session_state.pop("editing_tp", None)
+                        st.rerun()
             if paged_a:
                 db.render_page_nav(assigned, "assign_list_page")
     else:
@@ -73,14 +83,13 @@ with tab_assign:
     editing_tp = st.session_state.get("editing_tp")   # 위에서 이미 선언됨
     if editing_tp:
         st.divider()
-        st.markdown(f"**{editing_tp['name']}** 배정 정보 수정")
+        st.markdown(f"**{editing_tp['name']}** 배정 수정 (성별·스타일은 선수관리에서 변경)")
         with st.form("edit_tp_form"):
-            new_title = st.text_input("직함", value=editing_tp.get("title") or "")
             new_wc = st.checkbox("와일드카드", value=editing_tp["is_wildcard"])
             c1, c2 = st.columns(2)
             with c1:
                 if st.form_submit_button("저장"):
-                    db.update_tournament_player(editing_tp["id"], new_title.strip(), new_wc)
+                    db.update_tournament_player(editing_tp["id"], new_wc)
                     st.session_state.pop("editing_tp", None)
                     st.success("수정했습니다.")
                     st.rerun()
@@ -103,7 +112,6 @@ with tab_assign:
                 "추가할 선수 선택",
                 options=[p["name"] for p in available],
             )
-            title_input = st.text_input("직함 (선택사항, 공통 적용)")
             wc_input = st.checkbox("와일드카드")
 
             if st.form_submit_button("배정"):
@@ -112,7 +120,7 @@ with tab_assign:
                 else:
                     name_to_id = {p["name"]: p["id"] for p in available}
                     for name in selected_players:
-                        db.add_player_to_tournament(tid, name_to_id[name], title_input.strip(), wc_input)
+                        db.add_player_to_tournament(tid, name_to_id[name], wc_input)
                     st.success(f"{len(selected_players)}명 배정 완료!")
                     st.rerun()
 

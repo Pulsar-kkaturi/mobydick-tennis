@@ -1,7 +1,7 @@
 """
 Supabase 클라이언트 연결 및 공통 DB 유틸리티
 """
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple
 
 import streamlit as st
 from supabase import create_client, Client
@@ -206,7 +206,7 @@ def get_tournament_players(tournament_id: int):
     db = get_client()
     res = (
         db.table("tournament_players")
-        .select("id, title, is_wildcard, players(id, name)")
+        .select("id, is_wildcard, players(id, name)")
         .eq("tournament_id", tournament_id)
         .execute()
     )
@@ -217,30 +217,26 @@ def get_tournament_players(tournament_id: int):
             "id": row["id"],                        # tournament_players.id
             "player_id": row["players"]["id"],
             "name": row["players"]["name"],
-            "title": row["title"],
             "is_wildcard": row["is_wildcard"],
         })
     return result
 
 
-def add_player_to_tournament(tournament_id: int, player_id: int, title: str = "", is_wildcard: bool = False):
-    """선수 풀에서 선수를 대회에 배정"""
+def add_player_to_tournament(tournament_id: int, player_id: int, is_wildcard: bool = False):
+    """선수 풀에서 선수를 대회에 배정 (직함 필드는 사용하지 않음)"""
     db = get_client()
     db.table("tournament_players").insert({
         "tournament_id": tournament_id,
         "player_id": player_id,
-        "title": title,
+        "title": None,
         "is_wildcard": is_wildcard,
     }).execute()
 
 
-def update_tournament_player(tp_id: int, title: str, is_wildcard: bool):
-    """대회 내 선수의 직함/와일드카드 수정"""
+def update_tournament_player(tp_id: int, is_wildcard: bool):
+    """대회 내 선수의 와일드카드 여부만 수정"""
     db = get_client()
-    db.table("tournament_players").update({
-        "title": title,
-        "is_wildcard": is_wildcard,
-    }).eq("id", tp_id).execute()
+    db.table("tournament_players").update({"is_wildcard": is_wildcard}).eq("id", tp_id).execute()
 
 
 def remove_player_from_tournament(tp_id: int):
