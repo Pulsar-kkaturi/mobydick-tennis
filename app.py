@@ -15,6 +15,21 @@ st.set_page_config(
     layout="wide",
 )
 
+# ── 회원가입 직후 안내 (한 번만 뜨는 다이얼로그) ───────────────────────────────
+_popup = st.session_state.pop("signup_popup_payload", None)
+if _popup:
+    @st.dialog("회원가입 완료")
+    def _signup_done_dialog():
+        st.markdown(f"**{_popup['name']}** 님")
+        st.markdown(f"`{_popup['email']}`")
+        st.success("위 이메일로 가입이 완료되었습니다.")
+        if _popup.get("detail"):
+            st.caption(_popup["detail"])
+        if st.button("확인", type="primary", use_container_width=True):
+            st.rerun()
+
+    _signup_done_dialog()
+
 # ── 사이드바: 로그인/로그아웃 ─────────────────────────────────────────────────
 with st.sidebar:
     user = auth.get_user()
@@ -37,6 +52,16 @@ with st.sidebar:
                     else:
                         st.error("이메일 또는 비밀번호가 틀렸습니다.")
 
+                with st.expander("비밀번호를 잊으셨나요?", expanded=False):
+                    st.caption("가입 시 사용한 이메일로 재설정 링크를 보냅니다.")
+                    re_email = st.text_input("이메일", key="reset_pw_email")
+                    if st.button("재설정 메일 보내기", key="btn_reset_pw"):
+                        ok_r, msg_r = auth.send_password_reset_email(re_email)
+                        if ok_r:
+                            st.success(msg_r)
+                        else:
+                            st.error(msg_r)
+
             with tab_signup:
                 st.caption("영문+숫자 조합 8자 이상 비밀번호")
                 su_name = st.text_input("이름", key="su_name")
@@ -57,7 +82,11 @@ with st.sidebar:
                     else:
                         ok, msg = auth.signup(su_name, su_email, su_pw, su_birth)
                         if ok:
-                            st.success(msg)
+                            st.session_state["signup_popup_payload"] = {
+                                "name": su_name.strip(),
+                                "email": su_email.strip(),
+                                "detail": msg,
+                            }
                             st.rerun()
                         else:
                             st.error(msg)

@@ -100,6 +100,27 @@ def signup(full_name: str, email: str, password: str, birth_date) -> tuple[bool,
         return False, f"가입 실패: {e}"
 
 
+def send_password_reset_email(email: str) -> tuple[bool, str]:
+    """
+    비밀번호 재설정 메일 발송 (Supabase 기본 플로우).
+    사용자는 메일의 링크를 눌러 새 비밀번호를 설정합니다.
+    Streamlit Cloud 사용 시 Supabase Auth에 Site URL / Redirect URLs 등록 필요.
+    """
+    em = (email or "").strip()
+    if not em:
+        return False, "이메일을 입력해 주세요."
+    try:
+        client = db.get_client()
+        opts: dict = {}
+        # secrets.toml 에 있으면 재설정 완료 후 이 주소로 리다이렉트
+        if "PASSWORD_RESET_REDIRECT_URL" in st.secrets:
+            opts["redirect_to"] = st.secrets["PASSWORD_RESET_REDIRECT_URL"]
+        client.auth.reset_password_for_email(em, options=opts or None)
+        return True, "재설정 안내 메일을 보냈습니다. 메일함(스팸함 포함)을 확인해 주세요."
+    except Exception as e:
+        return False, f"요청 실패: {e}"
+
+
 def login(email: str, password: str) -> bool:
     """이메일/비밀번호로 로그인. 성공 시 role도 함께 로드."""
     try:

@@ -17,6 +17,24 @@ Streamlit + Supabase 기반으로 만들어졌으며, Streamlit Cloud를 통해 
 1. 사이드바 **로그인 / 회원가입** → **회원가입** 탭
 2. **이름, 이메일(ID), 비밀번호(영문+숫자 8자 이상), 생년월일** 입력
 3. 가입 후 로그인 (이메일 확인을 켜 둔 프로젝트는 메일 링크 확인 후 로그인)
+4. 가입 성공 시 **이름·이메일** 안내 **팝업(다이얼로그)** 이 한 번 뜹니다.
+
+### 비밀번호를 잊었을 때 (선택지 3가지)
+
+**1) 앱에서 재설정 메일 (이미 구현됨)**  
+로그인 탭 → **비밀번호를 잊으셨나요?** → 이메일 입력 → 메일로 온 **링크**에서 새 비밀번호 설정 (6자리 숫자 입력 방식이 아님).  
+Supabase **Authentication → URL Configuration** 에서 **Site URL** 과 **Redirect URLs** 에 배포 주소(예: `https://xxx.streamlit.app`)를 넣어 두세요.  
+선택으로 `secrets.toml` / Streamlit Secrets에 다음을 넣으면 재설정 후 돌아올 주소를 지정할 수 있습니다.
+
+```toml
+PASSWORD_RESET_REDIRECT_URL = "https://본인앱.streamlit.app/"
+```
+
+**2) Supabase 대시보드 (운영자만)**  
+**Authentication → Users** → 해당 사용자 → 비밀번호 재설정/초기화 메뉴 사용.
+
+**3) 마스터에게 연락**  
+소규모 클럽이면 (2)를 대신 해 달라고 요청하는 방식도 현실적입니다.
 
 ### 관리자 지정 (마스터 전용)
 
