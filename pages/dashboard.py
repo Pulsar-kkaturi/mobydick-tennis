@@ -82,7 +82,6 @@ else:
                     "🥇": gold,
                     "🥈": silver,
                     "🥉": bronze,
-                    "참가 대회": len(detail),
                 })
 
             df = pd.DataFrame(rows)
