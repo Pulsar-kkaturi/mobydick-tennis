@@ -13,7 +13,9 @@ drop table if exists profiles cascade;
 -- auth.users 테이블의 id를 참조
 create table profiles (
   id uuid primary key references auth.users(id) on delete cascade,
-  role text not null default 'user'  -- 'admin' 또는 'user'
+  role text not null default 'user',  -- master / admin / user
+  full_name text,                       -- 회원가입 시 입력한 이름
+  birth_date date                       -- 생년월일
 );
 
 -- 대회 테이블

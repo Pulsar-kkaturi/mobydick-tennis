@@ -3,6 +3,8 @@
 - st.navigation()으로 페이지 구조 및 접근 권한 제어
 - 사이드바: 로그인/로그아웃 + 대회 선택
 """
+import datetime
+
 import streamlit as st
 import auth
 import db
@@ -23,14 +25,42 @@ with st.sidebar:
             auth.logout()
             st.rerun()
     else:
-        with st.expander("🔐 로그인", expanded=False):
-            email = st.text_input("이메일", key="login_email")
-            password = st.text_input("비밀번호", type="password", key="login_pw")
-            if st.button("로그인", use_container_width=True):
-                if auth.login(email, password):
-                    st.rerun()
-                else:
-                    st.error("이메일 또는 비밀번호가 틀렸습니다.")
+        with st.expander("🔐 로그인 / 회원가입", expanded=False):
+            tab_login, tab_signup = st.tabs(["로그인", "회원가입"])
+
+            with tab_login:
+                email = st.text_input("이메일", key="login_email")
+                password = st.text_input("비밀번호", type="password", key="login_pw")
+                if st.button("로그인", use_container_width=True, key="btn_login"):
+                    if auth.login(email, password):
+                        st.rerun()
+                    else:
+                        st.error("이메일 또는 비밀번호가 틀렸습니다.")
+
+            with tab_signup:
+                st.caption("영문+숫자 조합 8자 이상 비밀번호")
+                su_name = st.text_input("이름", key="su_name")
+                su_email = st.text_input("이메일 (로그인 ID)", key="su_email")
+                su_pw = st.text_input("비밀번호", type="password", key="su_pw")
+                su_pw2 = st.text_input("비밀번호 확인", type="password", key="su_pw2")
+                su_birth = st.date_input(
+                    "생년월일",
+                    min_value=datetime.date(1920, 1, 1),
+                    max_value=datetime.date.today(),
+                    value=None,
+                    key="su_birth",
+                )
+
+                if st.button("회원가입", use_container_width=True, key="btn_signup"):
+                    if su_pw != su_pw2:
+                        st.error("비밀번호 확인이 일치하지 않습니다.")
+                    else:
+                        ok, msg = auth.signup(su_name, su_email, su_pw, su_birth)
+                        if ok:
+                            st.success(msg)
+                            st.rerun()
+                        else:
+                            st.error(msg)
 
     st.divider()
 
@@ -65,9 +95,8 @@ match_in   = st.Page("pages/3_경기입력.py", title="경기입력",  icon="✏
 admin_page = st.Page("pages/admin.py",       title="운영",      icon="🛡️")
 
 # ── role에 따라 네비게이션 구성 ───────────────────────────────────────────────
-role = auth.get_role()
-
 if auth.is_admin():
+    # 마스터 & 관리자: 운영탭 포함 (탭 내부 권한은 admin.py에서 분기)
     nav = st.navigation({
         "": [dashboard, ranking, stats],
         "관리": [players],
@@ -75,13 +104,14 @@ if auth.is_admin():
         "운영": [admin_page],
     })
 elif auth.is_user():
+    # 일반 유저: 대회/선수 관리 가능, 운영탭 없음
     nav = st.navigation({
         "": [dashboard, ranking, stats],
         "관리": [players],
         "대회관리": [t_settings, bracket, match_in],
     })
 else:
-    # 게스트
+    # 게스트: 조회만
     nav = st.navigation([dashboard, ranking, stats])
 
 nav.run()

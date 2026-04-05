@@ -7,17 +7,54 @@ Streamlit + Supabase 기반으로 만들어졌으며, Streamlit Cloud를 통해 
 
 ## 로그인 & 접근 권한
 
-- **비로그인:** 대시보드, 순위표, 통계 페이지 열람 가능
-- **로그인:** 선수관리, 대회관리(대회설정/대진표/경기입력) 추가 접근 가능
+- **게스트(비로그인):** 대시보드, 순위표, 통계만 열람
+- **일반 유저:** 앱에서 **회원가입** 후 로그인 → 선수관리, 대회관리(대회설정/대진표/경기입력)
+- **관리자:** **마스터가 일반 유저 중에서 승급** (앱 **운영 → 유저 관리**에서 role을 `관리자`로 변경). 대회 승인 등 운영 탭의 **대회 승인**까지 사용 가능
+- **마스터:** 유저 관리(역할 변경·삭제) + 관리자와 동일한 운영 권한. **최초 1명만** 아래처럼 `master`로 지정하면 됨
 
-로그인 계정은 Supabase Authentication에서 관리합니다. 아래 Supabase 설정 완료 후 계정을 생성하세요.
+### 일반 유저 회원가입 (앱)
 
-### 관리자 계정 추가 방법
+1. 사이드바 **로그인 / 회원가입** → **회원가입** 탭
+2. **이름, 이메일(ID), 비밀번호(영문+숫자 8자 이상), 생년월일** 입력
+3. 가입 후 로그인 (이메일 확인을 켜 둔 프로젝트는 메일 링크 확인 후 로그인)
 
-1. Supabase 대시보드 좌측 메뉴 **Authentication → Users** 클릭
-2. **Add user → Create new user** 클릭
-3. 이메일과 비밀번호 입력 후 생성
-4. 앱 사이드바 로그인 폼에서 해당 이메일/비밀번호로 로그인
+### 관리자 지정 (마스터 전용)
+
+별도로 Supabase에 “관리자 계정”을 만들 필요는 없습니다.  
+**앱에서 회원가입한 사람**을 마스터가 **운영 → 유저 관리**에서 role을 **`관리자(admin)`** 로 바꾸면 됩니다.
+
+### 최초 마스터 1명만 만들기
+
+서비스를 처음 켤 때는 **마스터가 0명**이라 앱에서 유저 관리를 열 수 없습니다. 아래 중 하나로 **한 명만** `master`로 올리세요.
+
+**방법 A — 본인이 앱에서 먼저 회원가입**
+
+1. 앱에서 회원가입 후 로그인 (이때는 `user` 권한)
+2. Supabase **Authentication → Users**에서 본인 계정의 **UUID** 복사
+3. SQL Editor에서 실행:
+
+```sql
+insert into profiles (id, role, full_name)
+values ('여기에-본인-uuid', 'master', '운영자')
+on conflict (id) do update set role = 'master', full_name = coalesce(excluded.full_name, profiles.full_name);
+```
+
+4. 앱에서 로그아웃 후 다시 로그인하면 **운영 → 유저 관리**가 보입니다.
+
+**방법 B — Supabase에서 사용자 추가**
+
+1. **Authentication → Users → Add user**로 이메일/비밀번호 생성
+2. 위와 동일하게 SQL로 해당 UUID에 `role = 'master'` 지정
+
+### Supabase Auth 권장 설정 (클럽용)
+
+- **Authentication → Providers → Email**  
+  - 빠른 운영을 위해 **Confirm email** 을 끄면 가입 직후 바로 로그인됩니다.  
+  - 가입 직후 `profiles` 안정화를 위해 `migrations/up_to_date.sql` 실행을 권장합니다 (트리거 포함).
+
+### 기존 DB 마이그레이션
+
+**`migrations/up_to_date.sql` 한 파일만** SQL Editor에서 실행하면 됩니다. (`migrations/README.md` 참고)
 
 ---
 
@@ -148,7 +185,8 @@ git push
 mobydick-tennis/
 ├── app.py                  # 홈: 시즌 랭킹 + 대회 관리
 ├── db.py                   # Supabase 연결 및 모든 DB 함수
-├── schema.sql              # Supabase 테이블 생성 SQL (최초 1회 실행)
+├── schema.sql              # Supabase 테이블 생성 SQL (최초 1회 또는 전체 리셋 시)
+├── migrations/             # up_to_date.sql (기존 DB 패치) + README
 ├── requirements.txt        # Python 패키지 목록
 ├── pages/
 │   ├── 1_선수관리.py        # 선수 등록/수정/삭제 + 엑셀 import
