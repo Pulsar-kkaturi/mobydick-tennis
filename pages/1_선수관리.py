@@ -22,82 +22,85 @@ all_players = db.get_all_players()
 editing = st.session_state.get("editing_player")
 
 if all_players:
-    for p in all_players:
-        with st.container(border=True):
-            col_name, col_gender, col_style, col_btns = st.columns([2, 1, 2, 2])
-
-            with col_name:
-                st.markdown(f"**{p['name']}**")
-
-            with col_gender:
-                st.caption(p.get("gender") or "성별 미설정")
-
-            with col_style:
-                st.caption(p.get("play_style") or "스타일 미설정")
-
-            with col_btns:
-                btn_col1, btn_col2 = st.columns(2)
-                with btn_col1:
-                    if st.button("편집", key=f"edit_p_{p['id']}"):
-                        st.session_state["editing_player"] = p
-                with btn_col2:
-                    if is_admin:
-                        if st.button("삭제", key=f"del_p_{p['id']}"):
-                            db.delete_global_player(p["id"])
-                            st.session_state.pop("editing_player", None)
-                            st.rerun()
-
-        # 편집 중인 선수 행 바로 아래에 폼 (맨 아래가 아님)
-        if editing and editing.get("id") == p["id"]:
+    with st.expander(f"전체 선수 목록 ({len(all_players)}명)", expanded=True):
+        page_players, paged_p = db.get_page_slice(all_players, "player_list_page")
+        for p in page_players:
+            # 편집 중인 선수는 테두리 색으로 강조
+            is_editing_this = editing and editing.get("id") == p["id"]
             with st.container(border=True):
-                st.markdown(f"**{editing['name']}** 정보 편집")
+                col_name, col_gender, col_style, col_btns = st.columns([2, 1, 2, 2])
 
-                with st.form(f"edit_player_info_form_{p['id']}"):
-                    gender_options = ["(미설정)"] + db.GENDERS
-                    style_options = ["(미설정)"] + db.PLAY_STYLES
-
-                    current_gender = editing.get("gender") or "(미설정)"
-                    current_style = editing.get("play_style") or "(미설정)"
-
-                    new_gender = st.selectbox(
-                        "성별",
-                        gender_options,
-                        index=gender_options.index(current_gender) if current_gender in gender_options else 0,
-                    )
-                    new_style = st.selectbox(
-                        "플레이 스타일",
-                        style_options,
-                        index=style_options.index(current_style) if current_style in style_options else 0,
-                    )
-
-                    if is_admin:
-                        new_name = st.text_input("이름", value=editing["name"])
-
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        submitted_save = st.form_submit_button("저장")
-                    with c2:
-                        submitted_cancel = st.form_submit_button("취소")
-
-                    if submitted_save:
+                with col_name:
+                    label = f"**{p['name']}**" + (" ✏️" if is_editing_this else "")
+                    st.markdown(label)
+                with col_gender:
+                    st.caption(p.get("gender") or "성별 미설정")
+                with col_style:
+                    st.caption(p.get("play_style") or "스타일 미설정")
+                with col_btns:
+                    btn_col1, btn_col2 = st.columns(2)
+                    with btn_col1:
+                        btn_label = "편집 중" if is_editing_this else "편집"
+                        if st.button(btn_label, key=f"edit_p_{p['id']}", disabled=bool(is_editing_this)):
+                            st.session_state["editing_player"] = p
+                            st.rerun()
+                    with btn_col2:
                         if is_admin:
-                            new_name_val = new_name.strip()
-                            if new_name_val != editing["name"]:
-                                db.upsert_global_player(new_name_val, player_id=editing["id"])
-                        db.update_player_info(
-                            editing["id"],
-                            None if new_gender == "(미설정)" else new_gender,
-                            None if new_style == "(미설정)" else new_style,
-                        )
-                        st.session_state.pop("editing_player", None)
-                        st.success("저장했습니다.")
-                        st.rerun()
+                            if st.button("삭제", key=f"del_p_{p['id']}"):
+                                db.delete_global_player(p["id"])
+                                st.session_state.pop("editing_player", None)
+                                st.rerun()
 
-                    if submitted_cancel:
-                        st.session_state.pop("editing_player", None)
-                        st.rerun()
+        if paged_p:
+            db.render_page_nav(all_players, "player_list_page")
+
 else:
     st.info("등록된 선수가 없습니다.")
+
+# ── 편집 폼: 목록 아래에 표시 ────────────────────────────────────────────────
+if editing:
+    st.divider()
+    with st.container(border=True):
+        st.subheader(f"✏️ **{editing['name']}** 정보 편집")
+        with st.form("edit_player_info_form"):
+            gender_options = ["(미설정)"] + db.GENDERS
+            style_options  = ["(미설정)"] + db.PLAY_STYLES
+            current_gender = editing.get("gender") or "(미설정)"
+            current_style  = editing.get("play_style") or "(미설정)"
+
+            new_gender = st.selectbox(
+                "성별", gender_options,
+                index=gender_options.index(current_gender) if current_gender in gender_options else 0,
+            )
+            new_style = st.selectbox(
+                "플레이 스타일", style_options,
+                index=style_options.index(current_style) if current_style in style_options else 0,
+            )
+            if is_admin:
+                new_name = st.text_input("이름", value=editing["name"])
+
+            c1, c2 = st.columns(2)
+            with c1:
+                submitted_save = st.form_submit_button("저장", type="primary", use_container_width=True)
+            with c2:
+                submitted_cancel = st.form_submit_button("취소", use_container_width=True)
+
+            if submitted_save:
+                if is_admin:
+                    new_name_val = new_name.strip()
+                    if new_name_val != editing["name"]:
+                        db.upsert_global_player(new_name_val, player_id=editing["id"])
+                db.update_player_info(
+                    editing["id"],
+                    None if new_gender == "(미설정)" else new_gender,
+                    None if new_style == "(미설정)" else new_style,
+                )
+                st.session_state.pop("editing_player", None)
+                st.success("저장했습니다.")
+                st.rerun()
+            if submitted_cancel:
+                st.session_state.pop("editing_player", None)
+                st.rerun()
 
 st.divider()
 

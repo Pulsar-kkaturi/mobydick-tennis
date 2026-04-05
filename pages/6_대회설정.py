@@ -11,15 +11,14 @@ from logic.scoring import PRESETS, apply_preset
 
 st.title("대회설정")
 
-tournament = st.session_state.get("selected_tournament")
+tournament = db.render_tournament_selector()
 if not tournament:
-    st.warning("사이드바에서 대회를 선택해 주세요.")
     st.stop()
 
 selected_name = tournament["name"]
 tid = tournament["id"]
 
-st.caption(f"현재 대회: **{selected_name}** — 설정은 이 대회에만 적용됩니다.")
+st.caption(f"설정은 **{selected_name}** 대회에만 적용됩니다.")
 
 tab_assign, tab_score = st.tabs(["선수 배정", "점수 설정"])
 
@@ -33,35 +32,45 @@ with tab_assign:
     assigned = db.get_tournament_players(tid)
     assigned_player_ids = {p["player_id"] for p in assigned}
 
-    st.markdown(f"**{selected_name}** 배정 선수 ({len(assigned)}명)")
+    # 편집 중인 선수가 있으면 해당 페이지로 자동 이동
+    editing_tp = st.session_state.get("editing_tp")
+    if editing_tp and assigned:
+        idx = next((i for i, p in enumerate(assigned) if p["id"] == editing_tp["id"]), None)
+        if idx is not None:
+            st.session_state["assign_list_page"] = idx // db.PAGE_SIZE + 1
 
     if assigned:
-        for p in assigned:
-            col1, col2, col3, col4, col5 = st.columns([2, 1, 2, 1, 1])
-            with col1:
-                st.write(f"**{p['name']}**")
-            with col2:
-                st.caption(p.get("title") or "-")
-            with col3:
-                player_info = next((pl for pl in db.get_all_players() if pl["id"] == p["player_id"]), {})
-                info_str = " | ".join(filter(None, [player_info.get("gender"), player_info.get("play_style")]))
-                st.caption(info_str or "-")
-            with col4:
-                st.caption("🃏 WC" if p["is_wildcard"] else "")
-            with col5:
-                c1, c2 = st.columns(2)
-                with c1:
-                    if st.button("수정", key=f"edit_tp_{p['id']}"):
-                        st.session_state["editing_tp"] = p
-                with c2:
-                    if st.button("제거", key=f"rem_tp_{p['id']}"):
-                        db.remove_player_from_tournament(p["id"])
-                        st.session_state.pop("editing_tp", None)
-                        st.rerun()
+        with st.expander(f"배정된 선수 ({len(assigned)}명)", expanded=True):
+            page_assigned, paged_a = db.get_page_slice(assigned, "assign_list_page")
+            all_pool = db.get_all_players()
+            for p in page_assigned:
+                col1, col2, col3, col4, col5 = st.columns([2, 1, 2, 1, 1])
+                with col1:
+                    st.write(f"**{p['name']}**")
+                with col2:
+                    st.caption(p.get("title") or "-")
+                with col3:
+                    player_info = next((pl for pl in all_pool if pl["id"] == p["player_id"]), {})
+                    info_str = " | ".join(filter(None, [player_info.get("gender"), player_info.get("play_style")]))
+                    st.caption(info_str or "-")
+                with col4:
+                    st.caption("🃏 WC" if p["is_wildcard"] else "")
+                with col5:
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if st.button("수정", key=f"edit_tp_{p['id']}"):
+                            st.session_state["editing_tp"] = p
+                    with c2:
+                        if st.button("제거", key=f"rem_tp_{p['id']}"):
+                            db.remove_player_from_tournament(p["id"])
+                            st.session_state.pop("editing_tp", None)
+                            st.rerun()
+            if paged_a:
+                db.render_page_nav(assigned, "assign_list_page")
     else:
         st.info("아직 배정된 선수가 없습니다.")
 
-    editing_tp = st.session_state.get("editing_tp")
+    editing_tp = st.session_state.get("editing_tp")   # 위에서 이미 선언됨
     if editing_tp:
         st.divider()
         st.markdown(f"**{editing_tp['name']}** 배정 정보 수정")

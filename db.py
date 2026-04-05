@@ -1,8 +1,88 @@
 """
 Supabase 클라이언트 연결 및 공통 DB 유틸리티
 """
+from typing import Optional, Tuple, List
+
 import streamlit as st
 from supabase import create_client, Client
+
+PAGE_SIZE = 10  # 페이지당 기본 항목 수
+
+
+def get_page_slice(items: list, key: str, page_size: int = PAGE_SIZE) -> Tuple[list, bool]:
+    """
+    items 를 페이지네이션해서 현재 페이지 항목만 반환.
+    page_size 이하면 페이지네이션 없이 전체 반환 (has_pages=False).
+
+    사용법:
+        page_items, paged = db.get_page_slice(all_items, "my_key")
+        for item in page_items:
+            render(item)
+        if paged:
+            db.render_page_nav(all_items, "my_key")
+    """
+    total = len(items)
+    if total <= page_size:
+        return items, False
+
+    total_pages = (total + page_size - 1) // page_size
+    page = max(1, min(st.session_state.get(key, 1), total_pages))
+    st.session_state[key] = page
+
+    start = (page - 1) * page_size
+    return items[start : start + page_size], True
+
+
+def render_page_nav(items: list, key: str, page_size: int = PAGE_SIZE) -> None:
+    """get_page_slice() 로 항목을 렌더링한 뒤 호출. 이전/다음 네비게이션 표시."""
+    total = len(items)
+    if total <= page_size:
+        return
+    total_pages = (total + page_size - 1) // page_size
+    page = st.session_state.get(key, 1)
+
+    col1, col2, col3 = st.columns([1, 3, 1])
+    with col1:
+        if st.button("◀ 이전", key=f"{key}_prev", disabled=(page <= 1), use_container_width=True):
+            st.session_state[key] = page - 1
+            st.rerun()
+    with col2:
+        st.markdown(
+            f"<p style='text-align:center; padding-top:6px'>{page} / {total_pages} 페이지 &nbsp;·&nbsp; 총 {total}개</p>",
+            unsafe_allow_html=True,
+        )
+    with col3:
+        if st.button("다음 ▶", key=f"{key}_next", disabled=(page >= total_pages), use_container_width=True):
+            st.session_state[key] = page + 1
+            st.rerun()
+
+
+def render_tournament_selector() -> Optional[dict]:
+    """
+    대회가 필요한 페이지 상단에서 호출.
+    대회 선택 selectbox를 표시하고 선택된 대회 dict를 반환한다.
+    대회가 없으면 안내 메시지 후 None 반환 (호출 측에서 st.stop() 권장).
+    """
+    tournaments = get_tournaments()
+    if not tournaments:
+        st.info("등록된 대회가 없습니다. 대시보드에서 먼저 대회를 생성해 주세요.")
+        return None
+
+    t_names = [t["name"] for t in tournaments]
+
+    # 이전에 선택한 대회 유지
+    prev = st.session_state.get("selected_tournament_name")
+    default_idx = t_names.index(prev) if prev in t_names else 0
+
+    selected_name = st.selectbox("대회 선택", t_names, index=default_idx, key="page_tournament_selector")
+    selected = next(t for t in tournaments if t["name"] == selected_name)
+
+    # 사이드바 선택과 session_state 공유 (대시보드 등 다른 페이지와 연동)
+    st.session_state["selected_tournament_name"] = selected_name
+    st.session_state["selected_tournament"] = selected
+
+    st.divider()
+    return selected
 
 
 @st.cache_resource
@@ -101,7 +181,7 @@ def upsert_global_player(name: str, player_id: int = None):
         db.table("players").insert({"name": name, "gender": None, "play_style": None}).execute()
 
 
-def update_player_info(player_id: int, gender: str | None, play_style: str | None):
+def update_player_info(player_id: int, gender: Optional[str], play_style: Optional[str]):
     """선수 추가 정보(성별, 스타일) 수정 — 유저도 가능."""
     db = get_client()
     db.table("players").update({

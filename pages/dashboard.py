@@ -102,41 +102,44 @@ with col_main:
     if not tournaments:
         st.info("대회가 없습니다.")
     else:
-        for t in tournaments:
-            with st.container(border=True):
-                c1, c2, c3, c4 = st.columns([4, 2, 1, 1])
-                with c1:
-                    status = "✅ 완료" if t["is_finished"] else "🔄 진행 중"
-                    legacy_badge = " &nbsp; `레거시`" if t.get("is_legacy") else ""
-                    st.markdown(f"**{t['name']}** &nbsp; {status}{legacy_badge}")
-                    if t.get("date"):
-                        st.caption(f"날짜: {t['date']}")
-                    if t.get("description"):
-                        st.caption(t["description"])
-                with c2:
-                    if t.get("is_legacy"):
-                        results = db.get_legacy_results(t["id"])
-                        st.caption(f"순위 기록: {len(results)}/3")
-                    else:
-                        players_count = len(db.get_tournament_players(t["id"]))
-                        matches_count = len(db.get_matches(t["id"]))
-                        st.caption(f"선수 {players_count}명 / 경기 {matches_count}개")
-                with c3:
-                    # 완료 처리는 로그인한 경우에만
-                    if logged_in:
-                        label = "완료 취소" if t["is_finished"] else "완료 처리"
-                        if st.button(label, key=f"finish_{t['id']}"):
-                            db.finish_tournament(t["id"], not t["is_finished"])
-                            st.rerun()
-                with c4:
-                    if logged_in:
-                        if st.button("삭제", key=f"del_t_{t['id']}"):
-                            if st.session_state.get(f"confirm_del_{t['id']}"):
-                                db.delete_tournament(t["id"])
+        with st.expander(f"대회 목록 ({len(tournaments)}개)", expanded=True):
+            page_t, paged_t = db.get_page_slice(tournaments, "dashboard_t_page")
+            for t in page_t:
+                with st.container(border=True):
+                    c1, c2, c3, c4 = st.columns([4, 2, 1, 1])
+                    with c1:
+                        status = "✅ 완료" if t["is_finished"] else "🔄 진행 중"
+                        legacy_badge = " &nbsp; `레거시`" if t.get("is_legacy") else ""
+                        st.markdown(f"**{t['name']}** &nbsp; {status}{legacy_badge}")
+                        if t.get("date"):
+                            st.caption(f"날짜: {t['date']}")
+                        if t.get("description"):
+                            st.caption(t["description"])
+                    with c2:
+                        if t.get("is_legacy"):
+                            results = db.get_legacy_results(t["id"])
+                            st.caption(f"순위 기록: {len(results)}/3")
+                        else:
+                            players_count = len(db.get_tournament_players(t["id"]))
+                            matches_count = len(db.get_matches(t["id"]))
+                            st.caption(f"선수 {players_count}명 / 경기 {matches_count}개")
+                    with c3:
+                        if logged_in:
+                            label = "완료 취소" if t["is_finished"] else "완료 처리"
+                            if st.button(label, key=f"finish_{t['id']}"):
+                                db.finish_tournament(t["id"], not t["is_finished"])
                                 st.rerun()
-                            else:
-                                st.session_state[f"confirm_del_{t['id']}"] = True
-                                st.warning("한 번 더 누르면 삭제됩니다.")
+                    with c4:
+                        if logged_in:
+                            if st.button("삭제", key=f"del_t_{t['id']}"):
+                                if st.session_state.get(f"confirm_del_{t['id']}"):
+                                    db.delete_tournament(t["id"])
+                                    st.rerun()
+                                else:
+                                    st.session_state[f"confirm_del_{t['id']}"] = True
+                                    st.warning("한 번 더 누르면 삭제됩니다.")
+            if paged_t:
+                db.render_page_nav(tournaments, "dashboard_t_page")
 
 with col_form:
     if logged_in:

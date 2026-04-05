@@ -10,10 +10,8 @@ from logic.schedule import generate_doubles_schedule, infer_match_type
 
 st.title("대진표")
 
-# 사이드바에서 선택한 대회를 session_state에서 읽어옴
-tournament = st.session_state.get("selected_tournament")
+tournament = db.render_tournament_selector()
 if not tournament:
-    st.warning("사이드바에서 대회를 선택해 주세요.")
     st.stop()
 
 selected_name = tournament["name"]

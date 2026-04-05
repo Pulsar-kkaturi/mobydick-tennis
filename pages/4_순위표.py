@@ -11,9 +11,8 @@ from logic.scoring import calculate_standings
 
 st.title("순위표")
 
-tournament = st.session_state.get("selected_tournament")
+tournament = db.render_tournament_selector()
 if not tournament:
-    st.warning("사이드바에서 대회를 선택해 주세요.")
     st.stop()
 
 selected_name = tournament["name"]

@@ -5,7 +5,6 @@
 """
 import streamlit as st
 import auth
-import db
 
 st.set_page_config(
     page_title="모비딕 테니스",
@@ -42,23 +41,6 @@ with st.sidebar:
             st.switch_page("pages/0_로그인.py")
 
     st.divider()
-
-    # 대회 선택 (모든 페이지에서 공유)
-    tournaments = db.get_tournaments()
-    if tournaments:
-        t_names = [t["name"] for t in tournaments]
-
-        prev = st.session_state.get("selected_tournament_name")
-        default_idx = t_names.index(prev) if prev in t_names else 0
-
-        selected_name = st.selectbox("대회 선택", t_names, index=default_idx)
-        st.session_state["selected_tournament_name"] = selected_name
-        st.session_state["selected_tournament"] = next(
-            t for t in tournaments if t["name"] == selected_name
-        )
-    else:
-        st.session_state.pop("selected_tournament", None)
-        st.caption("대회가 없습니다. 대시보드에서 생성해 주세요.")
 
 # ── 페이지 정의 ───────────────────────────────────────────────────────────────
 login_page  = st.Page("pages/0_로그인.py",      title="로그인",    icon="🔐")
