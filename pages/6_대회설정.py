@@ -1,24 +1,19 @@
 """
-점수 설정 페이지
-- 프리셋 선택으로 빠르게 계산 방식 변경
-- 항목별 ON/OFF + 점수값 직접 수정
+대회설정 페이지
+- 점수 계산 방식: 프리셋 선택 + 항목별 ON/OFF + 점수값 수정
 """
 import streamlit as st
 import db
 from logic.scoring import PRESETS, apply_preset
 
-st.set_page_config(page_title="점수 설정", page_icon="⚙️")
-st.title("점수 설정")
+st.title("대회설정")
 
-# ── 사이드바: 대회 선택 ───────────────────────────────────────────────────────
-tournaments = db.get_tournaments()
-if not tournaments:
-    st.warning("먼저 홈에서 대회를 만들어 주세요.")
+tournament = st.session_state.get("selected_tournament")
+if not tournament:
+    st.warning("사이드바에서 대회를 선택해 주세요.")
     st.stop()
 
-t_names = [t["name"] for t in tournaments]
-selected_name = st.sidebar.selectbox("대회 선택", t_names)
-tournament = next(t for t in tournaments if t["name"] == selected_name)
+selected_name = tournament["name"]
 tid = tournament["id"]
 
 st.caption(f"현재 대회: **{selected_name}** — 설정은 이 대회에만 적용됩니다.")

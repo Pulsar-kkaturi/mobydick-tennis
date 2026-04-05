@@ -9,18 +9,14 @@ import pandas as pd
 import db
 from logic.scoring import calculate_standings
 
-st.set_page_config(page_title="순위표", page_icon="🏆")
 st.title("순위표")
 
-# ── 사이드바: 대회 선택 ───────────────────────────────────────────────────────
-tournaments = db.get_tournaments()
-if not tournaments:
-    st.warning("먼저 홈에서 대회를 만들어 주세요.")
+tournament = st.session_state.get("selected_tournament")
+if not tournament:
+    st.warning("사이드바에서 대회를 선택해 주세요.")
     st.stop()
 
-t_names = [t["name"] for t in tournaments]
-selected_name = st.sidebar.selectbox("대회 선택", t_names)
-tournament = next(t for t in tournaments if t["name"] == selected_name)
+selected_name = tournament["name"]
 tid = tournament["id"]
 
 # ════════════════════════════════════════════════════════════════════════════════

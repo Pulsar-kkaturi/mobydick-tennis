@@ -8,18 +8,15 @@ import streamlit as st
 import db
 from logic.schedule import generate_doubles_schedule, infer_match_type
 
-st.set_page_config(page_title="대진표", page_icon="📋")
 st.title("대진표")
 
-# ── 사이드바: 대회 선택 ───────────────────────────────────────────────────────
-tournaments = db.get_tournaments()
-if not tournaments:
-    st.warning("먼저 홈에서 대회를 만들어 주세요.")
+# 사이드바에서 선택한 대회를 session_state에서 읽어옴
+tournament = st.session_state.get("selected_tournament")
+if not tournament:
+    st.warning("사이드바에서 대회를 선택해 주세요.")
     st.stop()
 
-t_names = [t["name"] for t in tournaments]
-selected_name = st.sidebar.selectbox("대회 선택", t_names)
-tournament = next(t for t in tournaments if t["name"] == selected_name)
+selected_name = tournament["name"]
 tid = tournament["id"]
 
 # 레거시 대회는 대진표 불필요

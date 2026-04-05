@@ -36,6 +36,12 @@ def finish_tournament(tournament_id: int, finished: bool):
     db.table("tournaments").update({"is_finished": finished}).eq("id", tournament_id).execute()
 
 
+def approve_tournament(tournament_id: int, approved: bool):
+    """관리자가 대회를 시즌 랭킹에 반영 승인/취소"""
+    db = get_client()
+    db.table("tournaments").update({"is_approved": approved}).eq("id", tournament_id).execute()
+
+
 def delete_tournament(tournament_id: int):
     db = get_client()
     db.table("tournaments").delete().eq("id", tournament_id).execute()
@@ -68,6 +74,16 @@ def clear_legacy_result(tournament_id: int, rank: int):
 
 # ── 전체 선수 풀(Global Players) ──────────────────────────────────────────────
 
+PLAY_STYLES = [
+    "오른손 / 투핸드 백핸드",
+    "왼손 / 투핸드 백핸드",
+    "오른손 / 원핸드 백핸드",
+    "왼손 / 원핸드 백핸드",
+]
+
+GENDERS = ["남", "여"]
+
+
 def get_all_players():
     """전체 선수 풀 반환 (대회 무관)"""
     db = get_client()
@@ -76,12 +92,22 @@ def get_all_players():
 
 
 def upsert_global_player(name: str, player_id: int = None):
-    """전체 선수 풀에 선수 추가 또는 이름 수정"""
+    """선수 이름 추가 또는 수정 (관리자 전용). gender/play_style은 별도 update 사용."""
     db = get_client()
     if player_id:
         db.table("players").update({"name": name}).eq("id", player_id).execute()
     else:
-        db.table("players").insert({"name": name}).execute()
+        # 생성 시 gender, play_style은 빈칸(None)으로 시작
+        db.table("players").insert({"name": name, "gender": None, "play_style": None}).execute()
+
+
+def update_player_info(player_id: int, gender: str | None, play_style: str | None):
+    """선수 추가 정보(성별, 스타일) 수정 — 유저도 가능."""
+    db = get_client()
+    db.table("players").update({
+        "gender": gender or None,
+        "play_style": play_style or None,
+    }).eq("id", player_id).execute()
 
 
 def delete_global_player(player_id: int):

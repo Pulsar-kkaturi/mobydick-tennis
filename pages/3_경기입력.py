@@ -6,18 +6,14 @@
 import streamlit as st
 import db
 
-st.set_page_config(page_title="경기 입력", page_icon="✏️")
 st.title("경기 결과 입력")
 
-# ── 사이드바: 대회 선택 ───────────────────────────────────────────────────────
-tournaments = db.get_tournaments()
-if not tournaments:
-    st.warning("먼저 홈에서 대회를 만들어 주세요.")
+tournament = st.session_state.get("selected_tournament")
+if not tournament:
+    st.warning("사이드바에서 대회를 선택해 주세요.")
     st.stop()
 
-t_names = [t["name"] for t in tournaments]
-selected_name = st.sidebar.selectbox("대회 선택", t_names)
-tournament = next(t for t in tournaments if t["name"] == selected_name)
+selected_name = tournament["name"]
 tid = tournament["id"]
 
 # 레거시 대회는 경기 입력 불필요
