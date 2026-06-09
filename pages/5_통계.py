@@ -13,7 +13,7 @@ st.title("통계 & 시각화")
 
 tournaments = db.get_tournaments()
 if tournaments:
-    st.subheader("연도별 랭킹포인트 추이 (선수별)")
+    st.subheader("연도별 랭킹포인트")
     approved_tournaments = [t for t in tournaments if t.get("is_approved")]
     if not approved_tournaments:
         st.info("승인된 대회가 없어 시즌 랭킹포인트 추이를 계산할 수 없습니다.")
@@ -43,7 +43,7 @@ if tournaments:
             if t.get("date")
         })
 
-        trend_rows = []
+        yearly_rows = []
         for year in years:
             year_tournaments = [
                 t for t in approved_tournaments
@@ -51,16 +51,25 @@ if tournaments:
             ]
             season_ranking = get_season_ranking(year_tournaments, standings_map)
             for r in season_ranking:
-                trend_rows.append({
+                yearly_rows.append({
                     "연도": year,
                     "선수": r["name"],
-                    "랭킹포인트": r["points"],
+                    "연도포인트": r["points"],
                 })
 
-        if not trend_rows:
+        if not yearly_rows:
             st.info("연도별 랭킹포인트 데이터가 없습니다.")
         else:
-            df_trend = pd.DataFrame(trend_rows)
+            df_yearly = pd.DataFrame(yearly_rows)
+            all_players = sorted(df_yearly["선수"].unique().tolist())
+            full_index = pd.MultiIndex.from_product([all_players, years], names=["선수", "연도"])
+            df_trend = (
+                df_yearly.set_index(["선수", "연도"])
+                .reindex(full_index, fill_value=0)
+                .reset_index()
+            )
+            df_trend["랭킹포인트"] = df_trend.groupby("선수")["연도포인트"].cumsum()
+
             # 모든 연도에서 포인트 합계가 0인 선수는 제외
             point_sum = df_trend.groupby("선수")["랭킹포인트"].sum()
             valid_players = point_sum[point_sum > 0].index.tolist()
@@ -69,6 +78,13 @@ if tournaments:
             if df_trend.empty:
                 st.info("포인트가 있는 선수가 없습니다.")
             else:
+                # 연도별 누적 포인트 순위(1~3위 라벨 표시용)
+                df_trend["순위"] = (
+                    df_trend.groupby("연도")["랭킹포인트"]
+                    .rank(method="dense", ascending=False)
+                    .astype(int)
+                )
+
                 fig_trend = px.line(
                     df_trend.sort_values(["선수", "연도"]),
                     x="연도",
@@ -78,11 +94,30 @@ if tournaments:
                     labels={"연도": "연도", "랭킹포인트": "랭킹포인트", "선수": "선수"},
                 )
                 fig_trend.update_layout(hovermode="x unified")
-                fig_trend.update_xaxes(type="category")
+                fig_trend.update_xaxes(
+                    type="category",
+                    categoryorder="array",
+                    categoryarray=years,
+                )
+                top3 = df_trend[df_trend["순위"].isin([1, 2, 3])].copy()
+                if not top3.empty:
+                    top3["라벨"] = top3.apply(lambda r: f"{int(r['순위'])}위 {r['선수']}", axis=1)
+                    fig_trend.add_trace(
+                        go.Scatter(
+                            x=top3["연도"],
+                            y=top3["랭킹포인트"],
+                            mode="text",
+                            text=top3["라벨"],
+                            textposition="top center",
+                            showlegend=False,
+                            hoverinfo="skip",
+                        )
+                    )
                 st.plotly_chart(fig_trend, use_container_width=True)
-                st.caption("시즌 랭킹포인트 기준: 승인된 대회만 집계합니다.")
+                st.caption("시즌 랭킹포인트 기준: 승인된 대회만 집계하며, 연도별 누적 포인트로 표시합니다.")
 
 st.divider()
+st.subheader("대회별 통계")
 
 tournament = db.render_tournament_selector()
 if not tournament:
@@ -191,7 +226,7 @@ st.plotly_chart(fig3, use_container_width=True)
 st.subheader("선수별 종합 비교 (상위 5명)")
 top5 = df.nlargest(5, "total")
 
-categories = ["경기수", "세트 승률", "게임 득실차", "세트 승리수", "게임 승리수"]
+categories = ["승점", "세트 승률", "게임 득실차", "세트 승리수", "게임 승리수"]
 
 
 def normalize_to_100(series: pd.Series) -> pd.Series:
@@ -204,7 +239,7 @@ def normalize_to_100(series: pd.Series) -> pd.Series:
 
 
 radar_df = df.copy()
-radar_df["norm_played"] = normalize_to_100(radar_df["played"])
+radar_df["norm_total"] = normalize_to_100(radar_df["total"])
 radar_df["norm_win_rate"] = normalize_to_100(radar_df["세트 승률(%)"])
 radar_df["norm_score_diff"] = normalize_to_100(radar_df["score_diff"])
 radar_df["norm_wins"] = normalize_to_100(radar_df["wins"])
@@ -214,7 +249,7 @@ fig4 = go.Figure()
 for _, row in radar_df[radar_df["name"].isin(top5["name"])].iterrows():
     fig4.add_trace(go.Scatterpolar(
         r=[
-            row["norm_played"],
+            row["norm_total"],
             row["norm_win_rate"],
             row["norm_score_diff"],
             row["norm_wins"],
@@ -226,8 +261,15 @@ for _, row in radar_df[radar_df["name"].isin(top5["name"])].iterrows():
     ))
 
 fig4.update_layout(
-    polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+    polar=dict(
+        radialaxis=dict(visible=True, range=[0, 100]),
+        angularaxis=dict(rotation=90, direction="clockwise"),
+    ),
     showlegend=True,
 )
 st.plotly_chart(fig4, use_container_width=True)
 st.caption("레이더 차트는 지표별 단위 차이를 줄이기 위해 0~100 정규화 기준으로 표시합니다.")
+top3_names = top5.head(3)["name"].tolist()
+if top3_names:
+    top3_label = " / ".join([f"{idx+1}위 {name}" for idx, name in enumerate(top3_names)])
+    st.caption(f"승점 기준 TOP3: {top3_label}")
