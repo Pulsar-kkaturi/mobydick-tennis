@@ -106,12 +106,22 @@ for m in matches:
         continue
     team1 = m["team1_player1"] + (f" / {m['team1_player2']}" if m.get("team1_player2") else "")
     team2 = m["team2_player1"] + (f" / {m['team2_player2']}" if m.get("team2_player2") else "")
+    team1_score = m.get("team1_score")
+    team2_score = m.get("team2_score")
+    if team1_score > team2_score:
+        team1_result, team2_result = "승", "패"
+    elif team1_score < team2_score:
+        team1_result, team2_result = "패", "승"
+    else:
+        team1_result, team2_result = "무", "무"
     completed_match_rows.append({
         "라운드": m.get("round") or "",
         "코트": m.get("court") or "",
         "팀1": team1,
-        "팀1 점수": m.get("team1_score"),
-        "팀2 점수": m.get("team2_score"),
+        "팀1 점수": team1_score,
+        "팀1 결과": team1_result,
+        "팀2 결과": team2_result,
+        "팀2 점수": team2_score,
         "팀2": team2,
     })
 
