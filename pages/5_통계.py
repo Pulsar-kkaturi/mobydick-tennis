@@ -235,7 +235,8 @@ st.plotly_chart(fig3, use_container_width=True)
 
 # ── 차트 4: 레이더 차트 (상위 5명) ───────────────────────────────────────────
 st.subheader("선수별 종합 비교 (상위 5명)")
-top5 = df.nlargest(5, "total")
+ranked_df = df.sort_values(["total", "name"], ascending=[False, True]).copy()
+top5 = ranked_df.head(5)
 
 categories = ["승점", "세트 승률", "게임 득실차", "세트 승리수", "게임 승리수"]
 
@@ -258,7 +259,7 @@ radar_df["norm_game_wins"] = normalize_to_100(radar_df["게임 승리수"])
 
 fig4 = go.Figure()
 top5_radar = radar_df[radar_df["name"].isin(top5["name"])].copy()
-top5_radar = top5_radar.sort_values("total", ascending=False)
+top5_radar = top5_radar.sort_values(["total", "name"], ascending=[False, True])
 line_colors = ["#1E88E5", "#D81B60", "#43A047", "#FB8C00", "#8E24AA"]
 for i, (_, row) in enumerate(top5_radar.iterrows()):
     fig4.add_trace(go.Scatterpolar(
@@ -287,3 +288,16 @@ fig4.update_layout(
 )
 st.caption("레이더 차트는 지표별 단위 차이를 줄이기 위해 0~100 정규화 기준으로 표시합니다.")
 st.plotly_chart(fig4, use_container_width=True)
+
+top3_rank = ranked_df.copy()
+top3_rank["순위"] = top3_rank["total"].rank(method="dense", ascending=False).astype(int)
+top3_rank = top3_rank[top3_rank["순위"].isin([1, 2, 3])]
+if not top3_rank.empty:
+    top3_grouped = (
+        top3_rank.groupby("순위", as_index=False)
+        .agg({"name": lambda s: ",".join(sorted(set(s)))})
+        .sort_values("순위")
+    )
+    medal_map = {1: "🥇", 2: "🥈", 3: "🥉"}
+    for _, row in top3_grouped.iterrows():
+        st.caption(f"{medal_map.get(int(row['순위']), '')} {int(row['순위'])}위: {row['name']}")
