@@ -23,6 +23,14 @@ jobs:
 
       - name: Send keepalive ping
         run: |
-          curl --fail --silent --show-error \
-            "$SUPABASE_URL/auth/v1/health"
-          echo "Supabase keepalive ping sent successfully."
+          STATUS_CODE=$(curl --silent --show-error --output /dev/null --write-out "%{http_code}" \
+            "$SUPABASE_URL/auth/v1/health")
+
+          # 200: public health endpoint, 401: auth required but endpoint reached.
+          if [ "$STATUS_CODE" = "200" ] || [ "$STATUS_CODE" = "401" ]; then
+            echo "Supabase keepalive ping accepted (HTTP $STATUS_CODE)."
+            exit 0
+          fi
+
+          echo "::error::Unexpected response from Supabase keepalive endpoint (HTTP $STATUS_CODE)."
+          exit 1
