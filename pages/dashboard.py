@@ -29,7 +29,7 @@ with col_title:
           (모비딕테니스 대회 & 랭킹 관리 시스템)
         </p>
         <p style="margin-top: 0.35rem; color: #7A7A7A; font-size: 0.95rem;">
-          version 1.01 (last updated: 2026.06.09)
+          version 1.03 (last updated: 2026.06.09)
         </p>
         """,
         unsafe_allow_html=True,
