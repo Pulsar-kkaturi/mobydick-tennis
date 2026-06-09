@@ -143,8 +143,6 @@ st.dataframe(
     hide_index=True,
 )
 
-st.divider()
-
 # ── 승점 계산 방식 확인 ────────────────────────────────────────────────────────
 with st.expander("승점 계산 방식"):
     for key, row in config.items():
