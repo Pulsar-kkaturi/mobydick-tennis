@@ -57,7 +57,7 @@ def render_page_nav(items: list, key: str, page_size: int = PAGE_SIZE) -> None:
             st.rerun()
 
 
-def render_tournament_selector() -> Optional[dict]:
+def render_tournament_selector(show_divider: bool = True) -> Optional[dict]:
     """
     대회가 필요한 페이지 상단에서 호출.
     대회 선택 selectbox를 표시하고 선택된 대회 dict를 반환한다.
@@ -81,7 +81,8 @@ def render_tournament_selector() -> Optional[dict]:
     st.session_state["selected_tournament_name"] = selected_name
     st.session_state["selected_tournament"] = selected
 
-    st.divider()
+    if show_divider:
+        st.divider()
     return selected
 
 

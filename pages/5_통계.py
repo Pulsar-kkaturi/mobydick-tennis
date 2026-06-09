@@ -13,7 +13,7 @@ st.title("통계 & 시각화")
 
 tournaments = db.get_tournaments()
 if tournaments:
-    st.subheader("연도별 랭킹포인트")
+    st.subheader("시즌별 랭킹포인트 추이")
     approved_tournaments = [t for t in tournaments if t.get("is_approved")]
     if not approved_tournaments:
         st.info("승인된 대회가 없어 시즌 랭킹포인트 추이를 계산할 수 없습니다.")
@@ -84,6 +84,12 @@ if tournaments:
                     .rank(method="dense", ascending=False)
                     .astype(int)
                 )
+                latest_year = max(years)
+                final_rank_df = (
+                    df_trend[df_trend["연도"] == latest_year][["선수", "랭킹포인트"]]
+                    .sort_values(["랭킹포인트", "선수"], ascending=[False, True])
+                )
+                legend_order = final_rank_df["선수"].tolist()
 
                 fig_trend = px.line(
                     df_trend.sort_values(["선수", "연도"]),
@@ -92,6 +98,7 @@ if tournaments:
                     color="선수",
                     markers=True,
                     labels={"연도": "연도", "랭킹포인트": "랭킹포인트", "선수": "선수"},
+                    category_orders={"선수": legend_order},
                 )
                 fig_trend.update_layout(hovermode="x unified")
                 fig_trend.update_xaxes(
@@ -123,7 +130,7 @@ if tournaments:
 st.divider()
 st.subheader("대회별 통계")
 
-tournament = db.render_tournament_selector()
+tournament = db.render_tournament_selector(show_divider=False)
 if not tournament:
     st.stop()
 
@@ -250,7 +257,10 @@ radar_df["norm_wins"] = normalize_to_100(radar_df["wins"])
 radar_df["norm_game_wins"] = normalize_to_100(radar_df["게임 승리수"])
 
 fig4 = go.Figure()
-for _, row in radar_df[radar_df["name"].isin(top5["name"])].iterrows():
+top5_radar = radar_df[radar_df["name"].isin(top5["name"])].copy()
+top5_radar = top5_radar.merge(top5[["name", "total"]], on="name", how="left").sort_values("total", ascending=False)
+line_colors = ["#1E88E5", "#D81B60", "#43A047", "#FB8C00", "#8E24AA"]
+for i, (_, row) in enumerate(top5_radar.iterrows()):
     fig4.add_trace(go.Scatterpolar(
         r=[
             row["norm_total"],
@@ -262,6 +272,10 @@ for _, row in radar_df[radar_df["name"].isin(top5["name"])].iterrows():
         theta=categories,
         fill="toself",
         name=row["name"],
+        line=dict(color=line_colors[i % len(line_colors)], width=2),
+        marker=dict(color=line_colors[i % len(line_colors)]),
+        fillcolor=line_colors[i % len(line_colors)],
+        opacity=0.28,
     ))
 
 fig4.update_layout(
@@ -272,27 +286,4 @@ fig4.update_layout(
     showlegend=True,
 )
 st.caption("레이더 차트는 지표별 단위 차이를 줄이기 위해 0~100 정규화 기준으로 표시합니다.")
-
-# 승점 축(맨 위) 포인트 옆에 1~3위 라벨 표시 (동률은 이름 병합)
-rank_df = df.copy()
-rank_df["순위"] = rank_df["total"].rank(method="dense", ascending=False).astype(int)
-rank_labels = rank_df[rank_df["순위"].isin([1, 2, 3])].copy()
-if not rank_labels.empty:
-    rank_labels = (
-        rank_labels.groupby(["순위", "total"], as_index=False)
-        .agg({"name": lambda s: ",".join(sorted(set(s)))})
-    )
-    rank_labels["norm_total"] = normalize_to_100(rank_labels["total"])
-    rank_labels["라벨"] = rank_labels.apply(lambda r: f"{int(r['순위'])}위 {r['name']}", axis=1)
-    fig4.add_trace(
-        go.Scatterpolar(
-            r=rank_labels["norm_total"],
-            theta=["승점"] * len(rank_labels),
-            mode="text",
-            text=rank_labels["라벨"],
-            textposition="middle right",
-            showlegend=False,
-            hoverinfo="skip",
-        )
-    )
 st.plotly_chart(fig4, use_container_width=True)
