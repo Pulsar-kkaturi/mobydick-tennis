@@ -17,6 +17,12 @@ if not tournament:
 
 selected_name = tournament["name"]
 tid = tournament["id"]
+selected_date = tournament.get("date")
+
+if selected_date:
+    st.caption(f"대회 날짜: {selected_date}")
+else:
+    st.caption("대회 날짜: 미설정")
 
 # ════════════════════════════════════════════════════════════════════════════════
 # 레거시 대회: 1~3위 직접 입력
@@ -159,6 +165,12 @@ with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
     df_matches.to_excel(writer, index=False, sheet_name="경기결과")
 buffer.seek(0)
 
+if selected_date:
+    ymd = str(selected_date).replace("-", "")
+    file_postfix = ymd[2:] if len(ymd) == 8 else "000000"
+else:
+    file_postfix = "000000"
+
 title_col, export_col = st.columns([5, 1.5])
 with title_col:
     st.subheader(f"{selected_name} 순위표")
@@ -166,7 +178,7 @@ with export_col:
     st.download_button(
         label="엑셀(XLSX)로 내보내기",
         data=buffer,
-        file_name=f"{selected_name}_순위표.xlsx",
+        file_name=f"{selected_name}_순위표_{file_postfix}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
     )
