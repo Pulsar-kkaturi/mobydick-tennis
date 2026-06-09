@@ -13,8 +13,18 @@ col_logo, col_title = st.columns([1, 6])
 with col_logo:
     st.image("Assets/LOGO_2026_HJA.png", width=90)
 with col_title:
-    st.title("모비딕 테니스")
-    st.caption("대회 관리 & 순위 시스템")
+    st.title("MOTIS")
+    st.markdown(
+        """
+        <p style="margin: 0; color: #111111; font-size: 1.35rem; font-weight: 600;">
+          Mobydick Open Tournament Information System (모비딕테니스 대회 & 랭킹 관리 시스템)
+        </p>
+        <p style="margin-top: 0.35rem; color: #7A7A7A; font-size: 0.95rem;">
+          version 1.01 (last updated: 2026.06.09)
+        </p>
+        """,
+        unsafe_allow_html=True,
+    )
 
 tournaments = db.get_tournaments()  # 날짜 최신순은 get_tournaments()에서 통일
 
