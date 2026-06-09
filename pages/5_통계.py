@@ -7,9 +7,82 @@ import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
 import db
-from logic.scoring import calculate_standings
+from logic.scoring import calculate_standings, get_season_ranking
 
 st.title("통계 & 시각화")
+
+tournaments = db.get_tournaments()
+if tournaments:
+    st.subheader("연도별 랭킹포인트 추이 (선수별)")
+    approved_tournaments = [t for t in tournaments if t.get("is_approved")]
+    if not approved_tournaments:
+        st.info("승인된 대회가 없어 시즌 랭킹포인트 추이를 계산할 수 없습니다.")
+    else:
+        standings_map = {}
+        for t in approved_tournaments:
+            tid = t["id"]
+            if t.get("is_legacy"):
+                legacy = db.get_legacy_results(tid)
+                standings_map[tid] = [
+                    {"name": r["player_name"], "rank": r["rank"]}
+                    for r in legacy
+                ]
+            else:
+                players_for_t = db.get_tournament_players(tid)
+                if players_for_t:
+                    standings_map[tid] = calculate_standings(
+                        players_for_t,
+                        db.get_matches(tid),
+                        db.get_scoring_config(tid),
+                        db.get_extra_scores(tid),
+                    )
+
+        years = sorted({
+            int(str(t["date"])[:4])
+            for t in approved_tournaments
+            if t.get("date")
+        })
+
+        trend_rows = []
+        for year in years:
+            year_tournaments = [
+                t for t in approved_tournaments
+                if t.get("date") and str(t["date"]).startswith(str(year))
+            ]
+            season_ranking = get_season_ranking(year_tournaments, standings_map)
+            for r in season_ranking:
+                trend_rows.append({
+                    "연도": year,
+                    "선수": r["name"],
+                    "랭킹포인트": r["points"],
+                })
+
+        if not trend_rows:
+            st.info("연도별 랭킹포인트 데이터가 없습니다.")
+        else:
+            df_trend = pd.DataFrame(trend_rows)
+            # 모든 연도에서 포인트 합계가 0인 선수는 제외
+            point_sum = df_trend.groupby("선수")["랭킹포인트"].sum()
+            valid_players = point_sum[point_sum > 0].index.tolist()
+            df_trend = df_trend[df_trend["선수"].isin(valid_players)]
+
+            if df_trend.empty:
+                st.info("포인트가 있는 선수가 없습니다.")
+            else:
+                fig_trend = px.line(
+                    df_trend.sort_values(["선수", "연도"]),
+                    x="연도",
+                    y="랭킹포인트",
+                    color="선수",
+                    markers=True,
+                    labels={"연도": "연도", "랭킹포인트": "랭킹포인트", "선수": "선수"},
+                )
+                fig_trend.update_layout(hovermode="x unified")
+                fig_trend.update_xaxes(type="category")
+                st.plotly_chart(fig_trend, use_container_width=True)
+                st.caption("시즌 랭킹포인트 기준: 승인된 대회만 집계합니다.")
+
+st.divider()
 
 tournament = db.render_tournament_selector()
 if not tournament:
@@ -17,6 +90,12 @@ if not tournament:
 
 selected_name = tournament["name"]
 tid = tournament["id"]
+selected_date = tournament.get("date")
+
+if selected_date:
+    st.caption(f"선택 대회 날짜: {selected_date}")
+else:
+    st.caption("선택 대회 날짜: 미설정")
 
 players = db.get_tournament_players(tid)
 matches = db.get_matches(tid)
@@ -34,14 +113,35 @@ if df.empty:
     st.info("경기 데이터가 없습니다.")
     st.stop()
 
-df["승률(%)"] = (df["wins"] / df["played"].replace(0, 1) * 100).round(1)
+df["세트 승률(%)"] = (df["wins"] / df["played"].replace(0, 1) * 100).round(1)
 
-# ── 차트 1: 총점 막대 ─────────────────────────────────────────────────────────
-st.subheader("총점 비교")
+
+def build_game_wins_map(match_rows: list[dict]) -> dict[str, int]:
+    """선수별 게임 승리수(획득 게임 합계) 계산."""
+    game_wins: dict[str, int] = {}
+    for m in match_rows:
+        s1 = m.get("team1_score")
+        s2 = m.get("team2_score")
+        if s1 is None or s2 is None:
+            continue
+        t1_players = [m.get("team1_player1"), m.get("team1_player2")]
+        t2_players = [m.get("team2_player1"), m.get("team2_player2")]
+        for p in [name for name in t1_players if name]:
+            game_wins[p] = game_wins.get(p, 0) + int(s1)
+        for p in [name for name in t2_players if name]:
+            game_wins[p] = game_wins.get(p, 0) + int(s2)
+    return game_wins
+
+
+game_wins_map = build_game_wins_map(matches)
+df["게임 승리수"] = df["name"].map(game_wins_map).fillna(0).astype(int)
+
+# ── 차트 1: 승점 막대 ─────────────────────────────────────────────────────────
+st.subheader("승점 비교")
 fig1 = px.bar(
     df.sort_values("total", ascending=True),
     x="total", y="name", orientation="h",
-    labels={"total": "총점", "name": "선수"},
+    labels={"total": "승점", "name": "선수"},
     color="total",
     color_continuous_scale="Greens",
     text="total",
@@ -50,15 +150,23 @@ fig1.update_traces(textposition="outside")
 fig1.update_layout(showlegend=False, coloraxis_showscale=False)
 st.plotly_chart(fig1, use_container_width=True)
 
+st.markdown("**승점 계산 방식**")
+active_rules = [row for row in config.values() if row.get("is_active")]
+if active_rules:
+    for row in active_rules:
+        st.caption(f"- {row['label']}: {row['score_value']}점")
+else:
+    st.caption("- 활성화된 승점 항목이 없습니다.")
+
 # ── 차트 2: 승률 ──────────────────────────────────────────────────────────────
-st.subheader("승률 (%)")
+st.subheader("세트 승률 (%)")
 fig2 = px.bar(
-    df.sort_values("승률(%)", ascending=True),
-    x="승률(%)", y="name", orientation="h",
-    labels={"승률(%)": "승률 (%)", "name": "선수"},
-    color="승률(%)",
+    df.sort_values("세트 승률(%)", ascending=True),
+    x="세트 승률(%)", y="name", orientation="h",
+    labels={"세트 승률(%)": "세트 승률 (%)", "name": "선수"},
+    color="세트 승률(%)",
     color_continuous_scale="Blues",
-    text="승률(%)",
+    text="세트 승률(%)",
 )
 fig2.update_traces(textposition="outside")
 fig2.update_layout(showlegend=False, coloraxis_showscale=False)
@@ -83,19 +191,43 @@ st.plotly_chart(fig3, use_container_width=True)
 st.subheader("선수별 종합 비교 (상위 5명)")
 top5 = df.nlargest(5, "total")
 
-categories = ["승리수", "경기수", "득실차 (양수화)"]
+categories = ["경기수", "세트 승률", "게임 득실차", "세트 승리수", "게임 승리수"]
+
+
+def normalize_to_100(series: pd.Series) -> pd.Series:
+    """지표를 0~100으로 정규화. 값이 모두 같으면 100으로 고정."""
+    min_v = series.min()
+    max_v = series.max()
+    if max_v == min_v:
+        return pd.Series([100.0] * len(series), index=series.index)
+    return (series - min_v) / (max_v - min_v) * 100.0
+
+
+radar_df = df.copy()
+radar_df["norm_played"] = normalize_to_100(radar_df["played"])
+radar_df["norm_win_rate"] = normalize_to_100(radar_df["세트 승률(%)"])
+radar_df["norm_score_diff"] = normalize_to_100(radar_df["score_diff"])
+radar_df["norm_wins"] = normalize_to_100(radar_df["wins"])
+radar_df["norm_game_wins"] = normalize_to_100(radar_df["게임 승리수"])
 
 fig4 = go.Figure()
-for _, row in top5.iterrows():
-    # 득실차는 음수가 있을 수 있어서 최솟값 기준으로 양수화
-    min_diff = df["score_diff"].min()
-    norm_diff = row["score_diff"] - min_diff
+for _, row in radar_df[radar_df["name"].isin(top5["name"])].iterrows():
     fig4.add_trace(go.Scatterpolar(
-        r=[row["wins"], row["played"], norm_diff],
+        r=[
+            row["norm_played"],
+            row["norm_win_rate"],
+            row["norm_score_diff"],
+            row["norm_wins"],
+            row["norm_game_wins"],
+        ],
         theta=categories,
         fill="toself",
         name=row["name"],
     ))
 
-fig4.update_layout(polar=dict(radialaxis=dict(visible=True)), showlegend=True)
+fig4.update_layout(
+    polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+    showlegend=True,
+)
 st.plotly_chart(fig4, use_container_width=True)
+st.caption("레이더 차트는 지표별 단위 차이를 줄이기 위해 0~100 정규화 기준으로 표시합니다.")
