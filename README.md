@@ -1,4 +1,5 @@
 # 모비딕 테니스 대회 관리 시스템
+## **MOAI**: Mobydick tennis club Open Arena Information system
 
 테니스 대회 점수 기록, 순위 계산, 시즌 랭킹을 관리하는 웹앱입니다.  
 Streamlit + Supabase 기반으로 만들어졌으며, Streamlit Cloud를 통해 무료로 배포할 수 있습니다.
