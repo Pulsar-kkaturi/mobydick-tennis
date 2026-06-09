@@ -94,6 +94,22 @@ if not players:
 
 standings = calculate_standings(players, matches, config, extra_scores)
 
+completed_match_rows = []
+for m in matches:
+    if m.get("team1_score") is None or m.get("team2_score") is None:
+        continue
+    team1 = m["team1_player1"] + (f" / {m['team1_player2']}" if m.get("team1_player2") else "")
+    team2 = m["team2_player1"] + (f" / {m['team2_player2']}" if m.get("team2_player2") else "")
+    completed_match_rows.append({
+        "라운드": m.get("round") or "",
+        "코트": m.get("court") or "",
+        "경기유형": m.get("match_type") or "",
+        "팀1": team1,
+        "팀1 점수": m.get("team1_score"),
+        "팀2 점수": m.get("team2_score"),
+        "팀2": team2,
+    })
+
 rows = []
 for s in standings:
     played = s["played"]
@@ -140,6 +156,8 @@ with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         })
     df_config = pd.DataFrame(config_rows)
     df_config.to_excel(writer, index=False, sheet_name="승점계산방식")
+    df_matches = pd.DataFrame(completed_match_rows)
+    df_matches.to_excel(writer, index=False, sheet_name="경기결과")
 buffer.seek(0)
 
 title_col, export_col = st.columns([5, 1.5])
@@ -167,3 +185,10 @@ with st.expander("승점 계산 방식"):
         st.write(f"{status} **{row['label']}** : {row['score_value']}점")
 
 st.divider()
+
+st.subheader("경기 결과 상세")
+if not completed_match_rows:
+    st.info("점수 입력이 완료된 경기가 없습니다.")
+else:
+    df_matches_view = pd.DataFrame(completed_match_rows)
+    st.dataframe(df_matches_view, use_container_width=True, hide_index=True)
