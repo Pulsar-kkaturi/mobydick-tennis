@@ -1,0 +1,35 @@
+name: Streamlit Keepalive
+
+on:
+  schedule:
+    # Twice a week, staggered from Supabase keepalive.
+    - cron: "10 0 * * 2,5"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      STREAMLIT_APP_URL: ${{ secrets.STREAMLIT_APP_URL }}
+
+    steps:
+      - name: Validate required secret
+        run: |
+          if [ -z "$STREAMLIT_APP_URL" ]; then
+            echo "::error::Missing STREAMLIT_APP_URL secret."
+            exit 1
+          fi
+
+      - name: Send keepalive ping
+        run: |
+          STATUS_CODE=$(curl --silent --show-error --location --output /dev/null --write-out "%{http_code}" \
+            "$STREAMLIT_APP_URL")
+
+          if [ "$STATUS_CODE" -ge 200 ] && [ "$STATUS_CODE" -lt 400 ]; then
+            echo "Streamlit keepalive ping accepted (HTTP $STATUS_CODE)."
+            exit 0
+          fi
+
+          echo "::error::Unexpected response from Streamlit keepalive endpoint (HTTP $STATUS_CODE)."
+          exit 1
