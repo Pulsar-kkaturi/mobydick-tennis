@@ -1,5 +1,5 @@
 """
-순위표 페이지
+대회 결과 페이지
 - 일반 대회: 경기 결과 기반 실시간 순위 계산 + 엑셀 내보내기
 - 레거시 대회: 1~3위 선수를 선수 풀에서 직접 선택해서 기록
 """
@@ -9,7 +9,7 @@ import pandas as pd
 import db
 from logic.scoring import calculate_standings
 
-st.title("순위표")
+st.title("대회 결과")
 
 tournament = db.render_tournament_selector()
 if not tournament:
@@ -112,9 +112,11 @@ for s in standings:
 
 df = pd.DataFrame(rows)
 
+
 def highlight_top3(row):
     colors = {1: "background-color: #FFD700", 2: "background-color: #C0C0C0", 3: "background-color: #CD7F32"}
     return [colors.get(row["순위"], "")] * len(row)
+
 
 st.dataframe(
     df.style.apply(highlight_top3, axis=1),

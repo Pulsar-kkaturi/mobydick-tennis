@@ -46,11 +46,11 @@ with st.sidebar:
 login_page  = st.Page("pages/0_로그인.py",      title="로그인",    icon="🔐")
 my_info     = st.Page("pages/7_내정보.py",      title="내 정보",   icon="👤")
 dashboard   = st.Page("pages/dashboard.py",     title="대시보드",  icon="🏠", default=True)
-ranking     = st.Page("pages/4_순위표.py",      title="순위표",    icon="🏆")
+ranking     = st.Page("pages/4_대회결과.py",    title="대회 결과",  icon="🏆")
 stats       = st.Page("pages/5_통계.py",        title="통계",      icon="📊")
 
 players     = st.Page("pages/1_선수관리.py",    title="선수관리",  icon="👥")
-t_manage    = st.Page("pages/8_대회관리.py",    title="대회관리",  icon="🆕")
+t_manage    = st.Page("pages/8_대회생성.py",    title="대회 생성",  icon="🆕")
 t_settings  = st.Page("pages/6_대회설정.py",   title="대회설정",  icon="⚙️")
 bracket     = st.Page("pages/2_대진표.py",      title="대진표",    icon="📋")
 match_in    = st.Page("pages/3_경기입력.py",    title="경기입력",  icon="✏️")

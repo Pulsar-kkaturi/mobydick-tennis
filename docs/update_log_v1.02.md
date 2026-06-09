@@ -29,7 +29,7 @@
   - tournament_type
 
 ### 3) New tournament management page
-- Added `pages/8_대회관리.py`
+- Added `pages/8_대회생성.py`
 - Moved "새 대회 만들기" form from dashboard to this page
 - Tournament type selection is required in the form (`Premier` / `Open`)
 - Included in app navigation under `대회관리`
@@ -60,6 +60,13 @@
   - `Premier🥇`, `Premier🥈`, `Premier🥉`
   - `Open🥇`, `Open🥈`, `Open🥉`
 - Updated ranking point caption to explain both point systems
+
+### 7) Page naming cleanup
+- Renamed page file for tournament results:
+  - `pages/4_순위표.py` -> `pages/4_대회결과.py`
+- Renamed page file for tournament creation:
+  - `pages/8_대회관리.py` -> `pages/8_대회생성.py`
+- Updated references/messages accordingly
 
 ## Validation checklist
 - [ ] Apply `migrations/up_to_date.sql` to existing DB

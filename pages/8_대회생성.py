@@ -1,12 +1,12 @@
 """
-대회관리 페이지
+대회 생성 페이지
 - 새 대회 생성 전용
 """
 import streamlit as st
 import auth
 import db
 
-st.title("대회관리")
+st.title("대회 생성")
 st.caption("새 대회를 생성하고 대회 등급(Premier/Open)을 설정합니다.")
 
 if not auth.is_logged_in():

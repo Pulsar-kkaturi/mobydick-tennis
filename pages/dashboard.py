@@ -5,9 +5,16 @@
 """
 import streamlit as st
 import pandas as pd
+from datetime import date
 import db
 import auth
 from logic.scoring import calculate_standings, get_season_ranking
+
+def get_default_year_index(year_options: list[str]) -> int:
+    """['전체', '2026', ...] 형태 옵션에서 기본 인덱스를 반환."""
+    target_year = str(date.today().year)
+    return year_options.index(target_year) if target_year in year_options else 0
+
 
 col_logo, col_title = st.columns([1, 6])
 with col_logo:
@@ -72,7 +79,13 @@ if not tournaments:
     st.info("아직 대회가 없습니다.")
 else:
     years = sorted({get_year(t) for t in tournaments}, reverse=True)
-    selected_year = st.selectbox("연도 선택", ["전체"] + years, index=0, key="season_year_select")
+    season_year_options = ["전체"] + years
+    selected_year = st.selectbox(
+        "연도 선택",
+        season_year_options,
+        index=get_default_year_index(season_year_options),
+        key="season_year_select",
+    )
 
     selected_tournaments = tournaments if selected_year == "전체" else [
         t for t in tournaments if get_year(t) == selected_year
@@ -153,7 +166,13 @@ if not tournaments:
     st.info("대회가 없습니다.")
 else:
     list_years = sorted({get_year(t) for t in tournaments}, reverse=True)
-    list_selected_year = st.selectbox("대회 목록 연도 선택", ["전체"] + list_years, index=0, key="list_year_select")
+    list_year_options = ["전체"] + list_years
+    list_selected_year = st.selectbox(
+        "대회 목록 연도 선택",
+        list_year_options,
+        index=get_default_year_index(list_year_options),
+        key="list_year_select",
+    )
     list_tournaments = tournaments if list_selected_year == "전체" else [
         t for t in tournaments if get_year(t) == list_selected_year
     ]
