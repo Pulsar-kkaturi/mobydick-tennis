@@ -16,8 +16,9 @@ with col_title:
     st.title("MOTIS")
     st.markdown(
         """
-        <p style="margin: 0; color: #111111; font-size: 1.35rem; font-weight: 600;">
-          Mobydick Open Tournament Information System (모비딕테니스 대회 & 랭킹 관리 시스템)
+        <p style="margin: 0; color: #111111; font-size: 1.40rem; font-weight: 600;">
+          Mobydick Open Tournament Information System<br> 
+          (모비딕테니스 대회 & 랭킹 관리 시스템)
         </p>
         <p style="margin-top: 0.35rem; color: #7A7A7A; font-size: 0.95rem;">
           version 1.01 (last updated: 2026.06.09)
