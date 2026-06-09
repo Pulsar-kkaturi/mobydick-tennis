@@ -101,6 +101,10 @@ if tournaments:
                 )
                 top3 = df_trend[df_trend["순위"].isin([1, 2, 3])].copy()
                 if not top3.empty:
+                    top3 = (
+                        top3.groupby(["연도", "순위", "랭킹포인트"], as_index=False)
+                        .agg({"선수": lambda s: ",".join(sorted(set(s)))})
+                    )
                     top3["라벨"] = top3.apply(lambda r: f"{int(r['순위'])}위 {r['선수']}", axis=1)
                     fig_trend.add_trace(
                         go.Scatter(
@@ -267,9 +271,28 @@ fig4.update_layout(
     ),
     showlegend=True,
 )
-st.plotly_chart(fig4, use_container_width=True)
 st.caption("레이더 차트는 지표별 단위 차이를 줄이기 위해 0~100 정규화 기준으로 표시합니다.")
-top3_names = top5.head(3)["name"].tolist()
-if top3_names:
-    top3_label = " / ".join([f"{idx+1}위 {name}" for idx, name in enumerate(top3_names)])
-    st.caption(f"승점 기준 TOP3: {top3_label}")
+
+# 승점 축(맨 위) 포인트 옆에 1~3위 라벨 표시 (동률은 이름 병합)
+rank_df = df.copy()
+rank_df["순위"] = rank_df["total"].rank(method="dense", ascending=False).astype(int)
+rank_labels = rank_df[rank_df["순위"].isin([1, 2, 3])].copy()
+if not rank_labels.empty:
+    rank_labels = (
+        rank_labels.groupby(["순위", "total"], as_index=False)
+        .agg({"name": lambda s: ",".join(sorted(set(s)))})
+    )
+    rank_labels["norm_total"] = normalize_to_100(rank_labels["total"])
+    rank_labels["라벨"] = rank_labels.apply(lambda r: f"{int(r['순위'])}위 {r['name']}", axis=1)
+    fig4.add_trace(
+        go.Scatterpolar(
+            r=rank_labels["norm_total"],
+            theta=["승점"] * len(rank_labels),
+            mode="text",
+            text=rank_labels["라벨"],
+            textposition="middle right",
+            showlegend=False,
+            hoverinfo="skip",
+        )
+    )
+st.plotly_chart(fig4, use_container_width=True)
