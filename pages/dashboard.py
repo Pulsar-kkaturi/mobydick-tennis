@@ -113,9 +113,6 @@ else:
             rows = []
             for r in season_ranking:
                 detail = r["detail"]
-                gold   = sum(1 for info in detail.values() if info["rank"] == 1)
-                silver = sum(1 for info in detail.values() if info["rank"] == 2)
-                bronze = sum(1 for info in detail.values() if info["rank"] == 3)
                 p_gold = sum(1 for info in detail.values() if info["rank"] == 1 and info.get("type") == "PREMIER")
                 p_silver = sum(1 for info in detail.values() if info["rank"] == 2 and info.get("type") == "PREMIER")
                 p_bronze = sum(1 for info in detail.values() if info["rank"] == 3 and info.get("type") == "PREMIER")
@@ -126,9 +123,6 @@ else:
                     "시즌순위": r["rank"],
                     "이름": r["name"],
                     "랭킹포인트": r["points"],
-                    "🥇": gold,
-                    "🥈": silver,
-                    "🥉": bronze,
                     "Premier🥇": p_gold,
                     "Premier🥈": p_silver,
                     "Premier🥉": p_bronze,
@@ -171,7 +165,7 @@ else:
             page_t, paged_t = db.get_page_slice(list_tournaments, "dashboard_t_page")
             for t in page_t:
                 with st.container(border=True):
-                    c1, c2, c3, c4 = st.columns([4, 3, 1, 1])
+                    c1, c2, c3, c4, c5 = st.columns([4, 2.3, 2.3, 1, 1])
                     with c1:
                         if t.get("is_approved"):
                             status = "🏆 승인"
@@ -195,15 +189,11 @@ else:
                             players_count = len(db.get_tournament_players(t["id"]))
                             matches_count = len(db.get_matches(t["id"]))
                             st.caption(f"선수 {players_count}명 / 경기 {matches_count}개")
-
+                    with c3:
                         podium = build_tournament_podium(t)
                         rank1 = ", ".join(podium[1]) if podium[1] else "—"
-                        rank2 = ", ".join(podium[2]) if podium[2] else "—"
-                        rank3 = ", ".join(podium[3]) if podium[3] else "—"
-                        st.caption(f"1위: {rank1}")
-                        st.caption(f"2위: {rank2}")
-                        st.caption(f"3위: {rank3}")
-                    with c3:
+                        st.caption(f"🥇 1위: {rank1}")
+                    with c4:
                         if logged_in:
                             label = "완료 취소" if t["is_finished"] else "완료 처리"
                             if t.get("is_approved"):
@@ -214,7 +204,7 @@ else:
                                 if st.button(label, key=f"finish_{t['id']}"):
                                     db.finish_tournament(t["id"], not t["is_finished"])
                                     st.rerun()
-                    with c4:
+                    with c5:
                         if logged_in:
                             if t.get("is_approved"):
                                 # 승인된 대회는 삭제 불가 — 운영 탭에서 승인 취소 후 삭제
