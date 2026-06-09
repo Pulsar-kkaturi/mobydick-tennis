@@ -98,7 +98,10 @@ rows = []
 for s in standings:
     played = s["played"]
     win_rate = (s["wins"] / played) if played > 0 else 0.0
-    bonus_total = s["wc_bonus"] + s["partner_bonus"] + s["extra"]
+    wc_bonus = s["wc_bonus"]
+    partner_bonus = s["partner_bonus"]
+    extra_bonus = s["extra"]
+    bonus_total = wc_bonus + partner_bonus + extra_bonus
     rows.append({
         "순위": s["rank"],
         "이름": s["name"],
@@ -109,10 +112,14 @@ for s in standings:
         "패": s["losses"],
         "득실차": s["score_diff"],
         "승률": f"{win_rate * 100:.1f}%",
-        "추가점수": bonus_total,
+        "보너스": bonus_total,
+        "WC보너스": wc_bonus,
+        "파트너보너스": partner_bonus,
+        "추가점수": extra_bonus,
     })
 
-df = pd.DataFrame(rows)
+df_export = pd.DataFrame(rows)
+df = df_export[["순위", "이름", "경기수", "승점", "승", "무", "패", "득실차", "승률", "보너스"]]
 
 
 def highlight_top3(row):
@@ -122,7 +129,7 @@ def highlight_top3(row):
 
 buffer = io.BytesIO()
 with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-    df.to_excel(writer, index=False, sheet_name="순위표")
+    df_export.to_excel(writer, index=False, sheet_name="순위표")
 buffer.seek(0)
 
 title_col, export_col = st.columns([5, 1.5])
