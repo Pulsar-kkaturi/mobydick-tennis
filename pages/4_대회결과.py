@@ -100,12 +100,9 @@ for m in matches:
         continue
     team1 = m["team1_player1"] + (f" / {m['team1_player2']}" if m.get("team1_player2") else "")
     team2 = m["team2_player1"] + (f" / {m['team2_player2']}" if m.get("team2_player2") else "")
-    match_type_value = (m.get("match_type") or "").strip().lower()
-    normalized_match_type = "복식" if ("복식" in match_type_value or "double" in match_type_value) else "단식"
     completed_match_rows.append({
         "라운드": m.get("round") or "",
         "코트": m.get("court") or "",
-        "경기유형": normalized_match_type,
         "팀1": team1,
         "팀1 점수": m.get("team1_score"),
         "팀2 점수": m.get("team2_score"),
