@@ -5,6 +5,7 @@
 """
 import streamlit as st
 import pandas as pd
+import io
 from datetime import date
 import db
 import auth
@@ -143,6 +144,42 @@ else:
                     "Open🥈": o_silver,
                     "Open🥉": o_bronze,
                 })
+
+            export_df = pd.DataFrame(rows)
+            tournament_rows = []
+            for t in approved_tournaments:
+                tid = t["id"]
+                standings = standings_map.get(tid, [])
+                rank1 = ", ".join([s["name"] for s in standings if s.get("rank") == 1]) or "-"
+                rank2 = ", ".join([s["name"] for s in standings if s.get("rank") == 2]) or "-"
+                rank3 = ", ".join([s["name"] for s in standings if s.get("rank") == 3]) or "-"
+                tournament_rows.append({
+                    "대회명": t["name"],
+                    "대회타입": "Premier" if (t.get("tournament_type") or "OPEN").upper() == "PREMIER" else "Open",
+                    "대회날짜": t.get("date") or "-",
+                    "1등": rank1,
+                    "2등": rank2,
+                    "3등": rank3,
+                })
+            tournament_df = pd.DataFrame(tournament_rows)
+            export_buffer = io.BytesIO()
+            with pd.ExcelWriter(export_buffer, engine="openpyxl") as writer:
+                export_df.to_excel(writer, index=False, sheet_name="시즌랭킹")
+                tournament_df.to_excel(writer, index=False, sheet_name="대회요약")
+            export_buffer.seek(0)
+
+            rank_title_col, rank_export_col = st.columns([5, 1.6])
+            with rank_title_col:
+                st.subheader("시즌 랭킹")
+            with rank_export_col:
+                st.download_button(
+                    label="엑셀 내보내기",
+                    data=export_buffer,
+                    file_name=f"시즌랭킹_{selected_year}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                    key=f"season_ranking_export_{selected_year}",
+                )
 
             with st.expander(f"시즌 랭킹 ({len(rows)}명)", expanded=True):
                 page_rows, paged_sr = db.get_page_slice(rows, "season_ranking_page")

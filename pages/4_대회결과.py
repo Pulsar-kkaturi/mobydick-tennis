@@ -130,6 +130,16 @@ def highlight_top3(row):
 buffer = io.BytesIO()
 with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
     df_export.to_excel(writer, index=False, sheet_name="순위표")
+    config_rows = []
+    for key, row in config.items():
+        config_rows.append({
+            "item_key": key,
+            "항목": row["label"],
+            "활성화": "Y" if row["is_active"] else "N",
+            "점수값": row["score_value"],
+        })
+    df_config = pd.DataFrame(config_rows)
+    df_config.to_excel(writer, index=False, sheet_name="승점계산방식")
 buffer.seek(0)
 
 title_col, export_col = st.columns([5, 1.5])
@@ -137,7 +147,7 @@ with title_col:
     st.subheader(f"{selected_name} 순위표")
 with export_col:
     st.download_button(
-        label="엑셀로 내보내기",
+        label="엑셀(XLSX)로 내보내기",
         data=buffer,
         file_name=f"{selected_name}_순위표.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
