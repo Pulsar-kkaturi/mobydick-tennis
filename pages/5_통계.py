@@ -258,7 +258,7 @@ radar_df["norm_game_wins"] = normalize_to_100(radar_df["게임 승리수"])
 
 fig4 = go.Figure()
 top5_radar = radar_df[radar_df["name"].isin(top5["name"])].copy()
-top5_radar = top5_radar.merge(top5[["name", "total"]], on="name", how="left").sort_values("total", ascending=False)
+top5_radar = top5_radar.sort_values("total", ascending=False)
 line_colors = ["#1E88E5", "#D81B60", "#43A047", "#FB8C00", "#8E24AA"]
 for i, (_, row) in enumerate(top5_radar.iterrows()):
     fig4.add_trace(go.Scatterpolar(
