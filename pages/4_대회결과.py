@@ -94,20 +94,22 @@ if not players:
 
 standings = calculate_standings(players, matches, config, extra_scores)
 
-st.subheader(f"{selected_name} 순위표")
-
 rows = []
 for s in standings:
+    played = s["played"]
+    win_rate = (s["wins"] / played) if played > 0 else 0.0
+    bonus_total = s["wc_bonus"] + s["partner_bonus"] + s["extra"]
     rows.append({
         "순위": s["rank"],
         "이름": s["name"],
-        "승리수": s["wins"],
         "경기수": s["played"],
+        "승점": s["total"],
+        "승": s["wins"],
+        "무": s["draws"],
+        "패": s["losses"],
         "득실차": s["score_diff"],
-        "WC보너스": s["wc_bonus"],
-        "파트너보너스": s["partner_bonus"],
-        "추가점수": s["extra"],
-        "총점": s["total"],
+        "승률": f"{win_rate * 100:.1f}%",
+        "추가점수": bonus_total,
     })
 
 df = pd.DataFrame(rows)
@@ -118,28 +120,35 @@ def highlight_top3(row):
     return [colors.get(row["순위"], "")] * len(row)
 
 
+buffer = io.BytesIO()
+with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+    df.to_excel(writer, index=False, sheet_name="순위표")
+buffer.seek(0)
+
+title_col, export_col = st.columns([5, 1.5])
+with title_col:
+    st.subheader(f"{selected_name} 순위표")
+with export_col:
+    st.download_button(
+        label="엑셀로 내보내기",
+        data=buffer,
+        file_name=f"{selected_name}_순위표.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+    )
+
 st.dataframe(
     df.style.apply(highlight_top3, axis=1),
     use_container_width=True,
     hide_index=True,
 )
 
-# ── 엑셀 내보내기 ─────────────────────────────────────────────────────────────
 st.divider()
-buffer = io.BytesIO()
-with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-    df.to_excel(writer, index=False, sheet_name="순위표")
-buffer.seek(0)
 
-st.download_button(
-    label="엑셀로 내보내기",
-    data=buffer,
-    file_name=f"{selected_name}_순위표.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-)
-
-# ── 현재 점수 계산 방식 확인 ──────────────────────────────────────────────────
-with st.expander("현재 점수 계산 방식 확인"):
+# ── 승점 계산 방식 확인 ────────────────────────────────────────────────────────
+with st.expander("승점 계산 방식"):
     for key, row in config.items():
         status = "✅" if row["is_active"] else "❌"
         st.write(f"{status} **{row['label']}** : {row['score_value']}점")
+
+st.divider()

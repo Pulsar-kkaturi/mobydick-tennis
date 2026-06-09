@@ -54,12 +54,15 @@
 ### 6) Dashboard enhancements
 - Added year filter to `대회 목록` section
 - Added tournament type badge (`Premier` / `Open`) in each tournament card
-- Added 1st/2nd/3rd display in each tournament card
-  - works for both legacy and normal tournaments
+- Updated tournament card layout to a single-line summary style
+  - `대회명/상태/등급/날짜 | 선수/경기 | 🥇 1위 | 완료처리 | 삭제`
+- Removed 2nd/3rd display in cards and keep only 1st-place display for readability
 - Expanded season table columns with type-specific medal counts:
   - `Premier🥇`, `Premier🥈`, `Premier🥉`
   - `Open🥇`, `Open🥈`, `Open🥉`
+- Removed legacy total medal columns (`🥇`, `🥈`, `🥉`) from season table
 - Updated ranking point caption to explain both point systems
+- Default year for both season ranking and tournament list now auto-selects current system year
 
 ### 7) Page naming cleanup
 - Renamed page file for tournament results:
@@ -67,11 +70,14 @@
 - Renamed page file for tournament creation:
   - `pages/8_대회관리.py` -> `pages/8_대회생성.py`
 - Updated references/messages accordingly
+- Updated navigation labels:
+  - `순위표` -> `대회 결과`
+  - `대회관리`(생성 서브메뉴) -> `대회 생성`
 
 ## Validation checklist
-- [ ] Apply `migrations/up_to_date.sql` to existing DB
-- [ ] Confirm old tournaments are set to `OPEN`
-- [ ] Create new tournaments with both `Premier` and `Open` types
-- [ ] Verify lock behavior in `대회설정` (완료/승인 시 수정 불가)
-- [ ] Verify season point totals by type
-- [ ] Verify dashboard year filter + podium display
+- [x] Apply `migrations/up_to_date.sql` to existing DB
+- [x] Confirm old tournaments are set to `OPEN`
+- [x] Create new tournaments with both `Premier` and `Open` types
+- [x] Verify lock behavior in `대회설정` (완료/승인 시 수정 불가)
+- [x] Verify season point totals by type
+- [x] Verify dashboard year filter + podium display
