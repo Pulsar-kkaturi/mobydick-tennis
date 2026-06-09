@@ -7,6 +7,7 @@
 """
 import streamlit as st
 import db
+from datetime import date
 from logic.scoring import PRESETS, apply_preset
 
 st.title("대회설정")
@@ -25,6 +26,51 @@ is_locked = tournament.get("is_finished") or tournament.get("is_approved")
 if is_locked:
     lock_reason = "승인된" if tournament.get("is_approved") else "완료 처리된"
     st.warning(f"🔒 {lock_reason} 대회입니다. 설정을 변경할 수 없습니다.")
+
+st.subheader("대회 정보")
+if is_locked:
+    st.info("대회 정보/등급 수정은 완료 취소 + 승인 취소 후 가능합니다.")
+
+raw_date = tournament.get("date")
+default_date = date.today()
+if raw_date:
+    if isinstance(raw_date, date):
+        default_date = raw_date
+    else:
+        try:
+            default_date = date.fromisoformat(str(raw_date))
+        except ValueError:
+            default_date = date.today()
+
+type_label_map = {"PREMIER": "Premier", "OPEN": "Open"}
+current_type = (tournament.get("tournament_type") or "OPEN").upper()
+current_label = type_label_map.get(current_type, "Open")
+
+with st.form("tournament_meta_form"):
+    t_name = st.text_input("대회 이름", value=tournament.get("name", ""))
+    t_date = st.date_input("대회 날짜 (선택)", value=default_date)
+    t_desc = st.text_area("메모 (선택)", value=tournament.get("description") or "", height=70)
+    t_type_label = st.selectbox("대회 등급", ["Premier", "Open"], index=0 if current_label == "Premier" else 1)
+    submitted = st.form_submit_button(
+        "대회 정보 저장",
+        disabled=is_locked,
+        help="완료/승인된 대회는 수정할 수 없습니다." if is_locked else None,
+    )
+    if submitted:
+        if not t_name.strip():
+            st.error("대회 이름을 입력해 주세요.")
+        else:
+            db.update_tournament_meta(
+                tournament_id=tid,
+                name=t_name.strip(),
+                date=str(t_date),
+                description=t_desc.strip(),
+                tournament_type="PREMIER" if t_type_label == "Premier" else "OPEN",
+            )
+            st.success("대회 정보를 저장했습니다.")
+            st.rerun()
+
+st.divider()
 
 tab_assign, tab_score = st.tabs(["선수 배정", "점수 설정"])
 

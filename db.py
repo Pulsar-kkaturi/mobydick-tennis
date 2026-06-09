@@ -108,14 +108,43 @@ def get_tournaments():
     return rows
 
 
-def create_tournament(name: str, date: str, description: str = "", is_legacy: bool = False):
+def create_tournament(
+    name: str,
+    date: str,
+    description: str = "",
+    is_legacy: bool = False,
+    tournament_type: str = "OPEN",
+):
     db = get_client()
+    normalized_type = (tournament_type or "OPEN").upper()
+    if normalized_type not in {"PREMIER", "OPEN"}:
+        normalized_type = "OPEN"
     db.table("tournaments").insert({
         "name": name,
         "date": date or None,
         "description": description,
         "is_legacy": is_legacy,
+        "tournament_type": normalized_type,
     }).execute()
+
+
+def update_tournament_meta(
+    tournament_id: int,
+    name: str,
+    date: str,
+    description: str = "",
+    tournament_type: str = "OPEN",
+):
+    db = get_client()
+    normalized_type = (tournament_type or "OPEN").upper()
+    if normalized_type not in {"PREMIER", "OPEN"}:
+        normalized_type = "OPEN"
+    db.table("tournaments").update({
+        "name": name,
+        "date": date or None,
+        "description": description,
+        "tournament_type": normalized_type,
+    }).eq("id", tournament_id).execute()
 
 
 def finish_tournament(tournament_id: int, finished: bool):

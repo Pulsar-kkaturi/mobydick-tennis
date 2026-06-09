@@ -178,25 +178,33 @@ def get_season_ranking(tournaments: list, standings_map: dict) -> list:
     standings_map: {tournament_id: standings_list}
     반환: [{"name": ..., "points": ..., "detail": {...tournament_id: rank}}, ...]
 
-    랭킹 포인트: 1위=3점, 2위=2점, 3위=1점, 4위 이하=0점
+    랭킹 포인트:
+    - PREMIER: 1위=5점, 2위=3점, 3위=2점
+    - OPEN:    1위=3점, 2위=2점, 3위=1점
+    - 4위 이하는 0점
     """
-    RANK_POINTS = {1: 3, 2: 2, 3: 1}
+    RANK_POINTS_BY_TYPE = {
+        "PREMIER": {1: 5, 2: 3, 3: 2},
+        "OPEN": {1: 3, 2: 2, 3: 1},
+    }
 
     season: dict[str, dict] = {}
 
     for t in tournaments:
         tid = t["id"]
+        t_type = (t.get("tournament_type") or "OPEN").upper()
+        rank_points = RANK_POINTS_BY_TYPE.get(t_type, RANK_POINTS_BY_TYPE["OPEN"])
         standings = standings_map.get(tid, [])
         for s in standings:
             name = s["name"]
             rank = s["rank"]
-            pts = RANK_POINTS.get(rank, 0)
+            pts = rank_points.get(rank, 0)
             if pts == 0:
                 continue  # 4위 이하는 랭킹 포인트 없음
             if name not in season:
                 season[name] = {"name": name, "points": 0, "detail": {}}
             season[name]["points"] += pts
-            season[name]["detail"][t["name"]] = {"rank": rank, "pts": pts}
+            season[name]["detail"][t["name"]] = {"rank": rank, "pts": pts, "type": t_type}
 
     # 랭킹 포인트 내림차순, 동점이면 이름순 (표시만)
     result = sorted(season.values(), key=lambda x: (-x["points"], x["name"]))

@@ -92,3 +92,31 @@ where not exists (
     select 1 from scoring_config sc
     where sc.tournament_id = t.id and sc.item_key = 'loss_score'
 );
+
+-- 5) tournaments: 대회 등급 컬럼 추가 (PREMIER / OPEN)
+alter table tournaments
+  add column if not exists tournament_type text;
+
+update tournaments
+set tournament_type = 'OPEN'
+where tournament_type is null or btrim(tournament_type) = '';
+
+alter table tournaments
+  alter column tournament_type set default 'OPEN';
+
+alter table tournaments
+  alter column tournament_type set not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'tournaments_tournament_type_check'
+      and conrelid = 'public.tournaments'::regclass
+  ) then
+    alter table tournaments
+      add constraint tournaments_tournament_type_check
+      check (tournament_type in ('PREMIER', 'OPEN'));
+  end if;
+end $$;

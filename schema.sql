@@ -25,6 +25,7 @@ create table tournaments (
   name text not null,
   date date,
   description text,
+  tournament_type text not null default 'OPEN' check (tournament_type in ('PREMIER', 'OPEN')),
   is_finished boolean default false,
   is_legacy boolean default false,
   is_approved boolean default false,   -- 관리자 승인 여부 (시즌 랭킹 반영 조건)

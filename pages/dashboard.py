@@ -31,19 +31,48 @@ tournaments = db.get_tournaments()  # 날짜 최신순은 get_tournaments()에�
 
 logged_in = auth.is_logged_in()
 
+
+def get_year(t):
+    if t.get("date"):
+        return str(t["date"])[:4]
+    return "날짜 미설정"
+
+
+def build_tournament_podium(t):
+    """대회별 1/2/3위 선수 목록 반환."""
+    tid = t["id"]
+    podium = {1: [], 2: [], 3: []}
+    if t.get("is_legacy"):
+        legacy = db.get_legacy_results(tid)
+        for row in legacy:
+            rank = row.get("rank")
+            if rank in podium:
+                podium[rank].append(row["player_name"])
+        return podium
+
+    players = db.get_tournament_players(tid)
+    if not players:
+        return podium
+    standings = calculate_standings(
+        players,
+        db.get_matches(tid),
+        db.get_scoring_config(tid),
+        db.get_extra_scores(tid),
+    )
+    for row in standings:
+        rank = row.get("rank")
+        if rank in podium:
+            podium[rank].append(row["name"])
+    return podium
+
 # ── 시즌 전체 랭킹 ────────────────────────────────────────────────────────────
 st.header("시즌 전체 랭킹")
 
 if not tournaments:
     st.info("아직 대회가 없습니다.")
 else:
-    def get_year(t):
-        if t.get("date"):
-            return str(t["date"])[:4]
-        return "날짜 미설정"
-
     years = sorted({get_year(t) for t in tournaments}, reverse=True)
-    selected_year = st.selectbox("연도 선택", ["전체"] + years, index=0)
+    selected_year = st.selectbox("연도 선택", ["전체"] + years, index=0, key="season_year_select")
 
     selected_tournaments = tournaments if selected_year == "전체" else [
         t for t in tournaments if get_year(t) == selected_year
@@ -87,6 +116,12 @@ else:
                 gold   = sum(1 for info in detail.values() if info["rank"] == 1)
                 silver = sum(1 for info in detail.values() if info["rank"] == 2)
                 bronze = sum(1 for info in detail.values() if info["rank"] == 3)
+                p_gold = sum(1 for info in detail.values() if info["rank"] == 1 and info.get("type") == "PREMIER")
+                p_silver = sum(1 for info in detail.values() if info["rank"] == 2 and info.get("type") == "PREMIER")
+                p_bronze = sum(1 for info in detail.values() if info["rank"] == 3 and info.get("type") == "PREMIER")
+                o_gold = sum(1 for info in detail.values() if info["rank"] == 1 and info.get("type") == "OPEN")
+                o_silver = sum(1 for info in detail.values() if info["rank"] == 2 and info.get("type") == "OPEN")
+                o_bronze = sum(1 for info in detail.values() if info["rank"] == 3 and info.get("type") == "OPEN")
                 rows.append({
                     "시즌순위": r["rank"],
                     "이름": r["name"],
@@ -94,6 +129,12 @@ else:
                     "🥇": gold,
                     "🥈": silver,
                     "🥉": bronze,
+                    "Premier🥇": p_gold,
+                    "Premier🥈": p_silver,
+                    "Premier🥉": p_bronze,
+                    "Open🥇": o_gold,
+                    "Open🥈": o_silver,
+                    "Open🥉": o_bronze,
                 })
 
             with st.expander(f"시즌 랭킹 ({len(rows)}명)", expanded=True):
@@ -108,24 +149,29 @@ else:
                 if paged_sr:
                     db.render_page_nav(rows, "season_ranking_page")
 
-            st.caption("랭킹 포인트: 1위=3점 / 2위=2점 / 3위=1점 / 4위 이하=미부여")
+            st.caption("랭킹 포인트: Premier(1위=5점, 2위=3점, 3위=2점) / Open(1위=3점, 2위=2점, 3위=1점) / 4위 이하=미부여")
 
 st.divider()
 
 # ── 대회 목록 ─────────────────────────────────────────────────────────────────
 st.header("대회 목록")
+if not tournaments:
+    st.info("대회가 없습니다.")
+else:
+    list_years = sorted({get_year(t) for t in tournaments}, reverse=True)
+    list_selected_year = st.selectbox("대회 목록 연도 선택", ["전체"] + list_years, index=0, key="list_year_select")
+    list_tournaments = tournaments if list_selected_year == "전체" else [
+        t for t in tournaments if get_year(t) == list_selected_year
+    ]
 
-col_main, col_form = st.columns([3, 2])
-
-with col_main:
-    if not tournaments:
-        st.info("대회가 없습니다.")
+    if not list_tournaments:
+        st.info(f"{list_selected_year}년에 해당하는 대회가 없습니다.")
     else:
-        with st.expander(f"대회 목록 ({len(tournaments)}개)", expanded=True):
-            page_t, paged_t = db.get_page_slice(tournaments, "dashboard_t_page")
+        with st.expander(f"대회 목록 ({len(list_tournaments)}개)", expanded=True):
+            page_t, paged_t = db.get_page_slice(list_tournaments, "dashboard_t_page")
             for t in page_t:
                 with st.container(border=True):
-                    c1, c2, c3, c4 = st.columns([4, 2, 1, 1])
+                    c1, c2, c3, c4 = st.columns([4, 3, 1, 1])
                     with c1:
                         if t.get("is_approved"):
                             status = "🏆 승인"
@@ -134,7 +180,9 @@ with col_main:
                         else:
                             status = "🔄 진행 중"
                         legacy_badge = " &nbsp; `레거시`" if t.get("is_legacy") else ""
-                        st.markdown(f"**{t['name']}** &nbsp; {status}{legacy_badge}")
+                        t_type = (t.get("tournament_type") or "OPEN").upper()
+                        type_badge = "`Premier`" if t_type == "PREMIER" else "`Open`"
+                        st.markdown(f"**{t['name']}** &nbsp; {status} &nbsp; {type_badge}{legacy_badge}")
                         if t.get("date"):
                             st.caption(f"날짜: {t['date']}")
                         if t.get("description"):
@@ -147,6 +195,14 @@ with col_main:
                             players_count = len(db.get_tournament_players(t["id"]))
                             matches_count = len(db.get_matches(t["id"]))
                             st.caption(f"선수 {players_count}명 / 경기 {matches_count}개")
+
+                        podium = build_tournament_podium(t)
+                        rank1 = ", ".join(podium[1]) if podium[1] else "—"
+                        rank2 = ", ".join(podium[2]) if podium[2] else "—"
+                        rank3 = ", ".join(podium[3]) if podium[3] else "—"
+                        st.caption(f"1위: {rank1}")
+                        st.caption(f"2위: {rank2}")
+                        st.caption(f"3위: {rank3}")
                     with c3:
                         if logged_in:
                             label = "완료 취소" if t["is_finished"] else "완료 처리"
@@ -173,23 +229,4 @@ with col_main:
                                         st.session_state[f"confirm_del_{t['id']}"] = True
                                         st.warning("한 번 더 누르면 삭제됩니다.")
             if paged_t:
-                db.render_page_nav(tournaments, "dashboard_t_page")
-
-with col_form:
-    if logged_in:
-        st.subheader("새 대회 만들기")
-        with st.form("create_tournament", clear_on_submit=True):
-            name = st.text_input("대회 이름", placeholder="예: 2026 상반기 리그")
-            date = st.date_input("대회 날짜 (선택)")
-            desc = st.text_area("메모 (선택)", height=60)
-            is_legacy = st.checkbox("레거시 대회", help="대진표·경기 없이 1~3위만 기록하는 과거 대회용 모드")
-
-            if st.form_submit_button("대회 생성"):
-                if not name.strip():
-                    st.error("대회 이름을 입력해 주세요.")
-                else:
-                    db.create_tournament(name.strip(), str(date), desc.strip(), is_legacy)
-                    st.success(f"'{name}' 대회를 만들었습니다!")
-                    st.rerun()
-    else:
-        st.info("대회를 생성하거나 관리하려면 로그인이 필요합니다.")
+                db.render_page_nav(list_tournaments, "dashboard_t_page")
