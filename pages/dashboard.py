@@ -248,7 +248,11 @@ else:
                     with c3:
                         podium = build_tournament_podium(t)
                         rank1 = ", ".join(podium[1]) if podium[1] else "—"
+                        rank2 = ", ".join(podium[2]) if podium[2] else "—"
+                        rank3 = ", ".join(podium[3]) if podium[3] else "—"
                         st.caption(f"🥇 1위: {rank1}")
+                        st.caption(f"🥈 2위: {rank2}")
+                        st.caption(f"🥉 3위: {rank3}")
                     with c4:
                         if logged_in:
                             label = "완료 취소" if t["is_finished"] else "완료 처리"
