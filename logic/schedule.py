@@ -128,6 +128,8 @@ def _build_singles_cycle_exact(names: list[str], courts: list[str], randomize: b
             block_matches.append((courts[ci], a, b))
         blocks.append(block_matches)
 
+    # 코트가 덜 차는(경기 수가 적은) 라운드는 뒤로 보냄
+    blocks.sort(key=len, reverse=True)
     return blocks
 
 
@@ -186,8 +188,6 @@ def generate_schedule(
         round_num = 1
         for _ in range(int(repeat_count)):
             blocks = cycle_blocks[:]
-            if randomize:
-                random.shuffle(blocks)
             for block in blocks:
                 for court, p1, p2 in block:
                     schedule.append({
@@ -339,7 +339,14 @@ def generate_schedule(
     cycle_rounds: dict[str, list[dict]] = {}
     for m in cycle_schedule:
         cycle_rounds.setdefault(m["round"], []).append(m)
-    ordered_round_keys = sorted(cycle_rounds.keys(), key=lambda x: int(str(x).lstrip("R")) if str(x).lstrip("R").isdigit() else 10**9)
+    # 코트가 덜 차는 라운드는 뒤로 정렬 (부족 라운드를 마지막으로)
+    ordered_round_keys = sorted(
+        cycle_rounds.keys(),
+        key=lambda x: (
+            -len(cycle_rounds[x]),
+            int(str(x).lstrip("R")) if str(x).lstrip("R").isdigit() else 10**9,
+        ),
+    )
 
     final_schedule = []
     round_num = 1
