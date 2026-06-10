@@ -1,7 +1,7 @@
 # 모비딕 테니스 대회 관리 시스템
 
-**MOAI (Mobydick tennis club Open Arena Information system)**  
-테니스 대회 점수 기록, 순위 계산, 시즌 랭킹을 관리하는 웹앱입니다.  
+MOTIS (Mobydick Open Tournament Information System)  
+모비딕테니스 대회 점수 기록, 순위 계산, 시즌 랭킹을 관리하는 웹앱입니다.  
 기술 스택: **Streamlit + Supabase**
 
 ---
@@ -9,8 +9,8 @@
 ## 문서 안내
 
 - 시작/개요: `README.md` (현재 문서)
-- 배포 가이드: [`README_DEPLOY.md`](README_DEPLOY.md)
-- 운영 가이드(권한/유저/마이그레이션/keepalive): [`README_OPERATIONS.md`](README_OPERATIONS.md)
+- 배포 가이드: `[README_DEPLOY.md](README_DEPLOY.md)`
+- 운영 가이드(권한/유저/마이그레이션/keepalive): `[README_OPERATIONS.md](README_OPERATIONS.md)`
 
 ---
 
@@ -45,8 +45,8 @@ uv run streamlit run app.py
 
 ## 배포/운영 핵심
 
-- Streamlit 배포 절차는 [`README_DEPLOY.md`](README_DEPLOY.md) 참고
-- 권한 정책(게스트/유저/관리자/마스터), 계정 운영, 비밀번호 재설정은 [`README_OPERATIONS.md`](README_OPERATIONS.md) 참고
+- Streamlit 배포 절차는 `[README_DEPLOY.md](README_DEPLOY.md)` 참고
+- 권한 정책(게스트/유저/관리자/마스터), 계정 운영, 비밀번호 재설정은 `[README_OPERATIONS.md](README_OPERATIONS.md)` 참고
 - 무료 플랜 sleep/pause 대응용 keepalive 워크플로:
   - `.github/workflows/supabase-keepalive.yml`
   - `.github/workflows/streamlit-keepalive.yml`
@@ -67,3 +67,4 @@ mobydick-tennis/
 ├── .github/workflows/
 └── .streamlit/
 ```
+
