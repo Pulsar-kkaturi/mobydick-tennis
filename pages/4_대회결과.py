@@ -18,11 +18,23 @@ if not tournament:
 selected_name = tournament["name"]
 tid = tournament["id"]
 selected_date = tournament.get("date")
+t_type = (tournament.get("tournament_type") or "OPEN").upper()
+
+if t_type == "PREMIER":
+    type_badge = "<span style='color:#1E88E5; font-weight:700;'>Premier</span>"
+else:
+    type_badge = "<span style='color:#6E6E6E; font-weight:600;'>Open</span>"
 
 if selected_date:
-    st.caption(f"대회 날짜: {selected_date}")
+    st.markdown(
+        f"<p style='margin:0; color:#6E6E6E;'>대회 날짜: {selected_date} &nbsp;|&nbsp; {type_badge}</p>",
+        unsafe_allow_html=True,
+    )
 else:
-    st.caption("대회 날짜: 미설정")
+    st.markdown(
+        f"<p style='margin:0; color:#6E6E6E;'>대회 날짜: 미설정 &nbsp;|&nbsp; {type_badge}</p>",
+        unsafe_allow_html=True,
+    )
 
 # ════════════════════════════════════════════════════════════════════════════════
 # 레거시 대회: 1~3위 직접 입력
