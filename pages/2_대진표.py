@@ -38,7 +38,7 @@ if matches:
     for m in matches:
         rounds.setdefault(m["round"], []).append(m)
 
-    for round_name, round_matches in sorted(rounds.items()):
+    for round_name, round_matches in sorted(rounds.items(), key=lambda item: db.round_sort_key(item[0])):
         st.markdown(f"### {round_name}")
         for m in round_matches:
             t1 = f"{m['team1_player1']}" + (f" / {m['team1_player2']}" if m.get("team1_player2") else "")

@@ -2,11 +2,38 @@
 Supabase 클라이언트 연결 및 공통 DB 유틸리티
 """
 from typing import Optional, Tuple
+import re
 
 import streamlit as st
 from supabase import create_client, Client
 
 PAGE_SIZE = 10  # 페이지당 기본 항목 수
+
+
+def round_sort_key(value: str) -> tuple[int, str]:
+    """라운드 문자열을 자연 정렬하기 위한 키 (예: R2 < R10)."""
+    text = str(value or "")
+    m = re.search(r"\d+", text)
+    if m:
+        return int(m.group()), text
+    return 10**9, text
+
+
+def court_sort_key(value: str) -> tuple[int, str]:
+    """코트 문자열 정렬 키 (숫자 우선, 그 외 문자열)."""
+    text = str(value or "")
+    m = re.search(r"\d+", text)
+    if m:
+        return int(m.group()), text
+    return 10**9, text
+
+
+def match_id_sort_key(value) -> int:
+    """경기 생성 순서(id) 정렬 키."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 10**9
 
 
 def get_page_slice(items: list, key: str, page_size: int = PAGE_SIZE) -> Tuple[list, bool]:
@@ -291,8 +318,12 @@ def remove_player_from_tournament(tp_id: int):
 
 def get_matches(tournament_id: int):
     db = get_client()
-    res = db.table("matches").select("*").eq("tournament_id", tournament_id).order("round").order("court").execute()
-    return res.data
+    res = db.table("matches").select("*").eq("tournament_id", tournament_id).execute()
+    rows = list(res.data or [])
+    rows.sort(key=lambda m: match_id_sort_key(m.get("id")))
+    rows.sort(key=lambda m: court_sort_key(m.get("court")))
+    rows.sort(key=lambda m: round_sort_key(m.get("round")))
+    return rows
 
 
 def upsert_match(tournament_id: int, data: dict, match_id: int = None):

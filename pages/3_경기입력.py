@@ -33,7 +33,7 @@ if not matches:
     st.stop()
 
 # 라운드 선택 필터
-rounds = sorted(set(m["round"] for m in matches))
+rounds = sorted(set(m["round"] for m in matches), key=db.round_sort_key)
 selected_round = st.selectbox("라운드 선택", ["전체"] + rounds)
 
 filtered = matches if selected_round == "전체" else [m for m in matches if m["round"] == selected_round]
@@ -86,6 +86,16 @@ for m in filtered:
         # 현재 저장된 점수 표시
         if m["team1_score"] is not None:
             st.caption(f"저장된 점수: {m['team1_score']} : {m['team2_score']}")
+
+if not is_locked and filtered:
+    st.caption("현재 화면의 점수 입력값을 일괄 저장합니다.")
+    if st.button("일괄 저장", key="save_all_visible_matches", type="primary"):
+        for m in filtered:
+            s1 = st.session_state.get(f"s1_{m['id']}", int(m["team1_score"]) if m["team1_score"] is not None else 0)
+            s2 = st.session_state.get(f"s2_{m['id']}", int(m["team2_score"]) if m["team2_score"] is not None else 0)
+            db.upsert_match(tid, {"team1_score": s1, "team2_score": s2}, match_id=m["id"])
+        st.success(f"{len(filtered)}경기 점수를 저장했습니다.")
+        st.rerun()
 
 # ── 추가 점수 입력 ────────────────────────────────────────────────────────────
 st.divider()
