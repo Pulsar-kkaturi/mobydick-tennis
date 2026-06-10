@@ -21,9 +21,17 @@ selected_date = tournament.get("date")
 t_type = (tournament.get("tournament_type") or "OPEN").upper()
 
 if t_type == "PREMIER":
-    type_badge = "<span style='color:#1E88E5; font-weight:700;'>Premier</span>"
+    type_badge = (
+        "<span style='display:inline-block; padding:1px 8px; border-radius:999px; "
+        "background:#E3F2FD; color:#1565C0; font-weight:700; border:1px solid #90CAF9;'>"
+        "Premier</span>"
+    )
 else:
-    type_badge = "<span style='color:#6E6E6E; font-weight:600;'>Open</span>"
+    type_badge = (
+        "<span style='display:inline-block; padding:1px 8px; border-radius:999px; "
+        "background:#E8F5E9; color:#2E7D32; font-weight:700; border:1px solid #A5D6A7;'>"
+        "Open</span>"
+    )
 
 if selected_date:
     st.markdown(

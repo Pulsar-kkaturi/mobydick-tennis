@@ -231,15 +231,23 @@ else:
                             status = "🔄 진행 중"
                         t_type = (t.get("tournament_type") or "OPEN").upper()
                         if t_type == "PREMIER":
-                            type_badge = "<span style='color:#1E88E5; font-weight:700;'>Premier</span>"
+                            type_badge = (
+                                "<span style='display:inline-block; padding:1px 8px; border-radius:999px; "
+                                "background:#E3F2FD; color:#1565C0; font-weight:700; border:1px solid #90CAF9;'>"
+                                "Premier</span>"
+                            )
                         else:
-                            type_badge = "<span style='color:#6E6E6E; font-weight:600;'>Open</span>"
+                            type_badge = (
+                                "<span style='display:inline-block; padding:1px 8px; border-radius:999px; "
+                                "background:#E8F5E9; color:#2E7D32; font-weight:700; border:1px solid #A5D6A7;'>"
+                                "Open</span>"
+                            )
                         legacy_badge = (
                             "&nbsp;<span style='color:#8A8A8A; font-size:0.85rem;'>레거시</span>"
                             if t.get("is_legacy") else ""
                         )
                         st.markdown(
-                            f"**{t['name']}** &nbsp; {status} &nbsp; {type_badge}{legacy_badge}",
+                            f"<span style='font-weight:700;'>{t['name']}</span> &nbsp; {type_badge} &nbsp; {status}{legacy_badge}",
                             unsafe_allow_html=True,
                         )
                         if t.get("date"):
