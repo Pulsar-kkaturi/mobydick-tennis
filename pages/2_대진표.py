@@ -5,6 +5,8 @@
 - 수동으로 경기 추가 / 삭제
 """
 import streamlit as st
+import io
+import pandas as pd
 import db
 from logic.schedule import generate_schedule, infer_match_type, recommend_matches_per_person
 
@@ -31,6 +33,31 @@ if is_locked:
 # ── 현재 대진표 표시 ──────────────────────────────────────────────────────────
 st.subheader(f"{selected_name} 대진표")
 matches = db.get_matches(tid)
+
+if matches:
+    export_rows = []
+    for m in matches:
+        t1 = f"{m['team1_player1']}" + (f" / {m['team1_player2']}" if m.get("team1_player2") else "")
+        t2 = f"{m['team2_player1']}" + (f" / {m['team2_player2']}" if m.get("team2_player2") else "")
+        export_rows.append({
+            "라운드": m.get("round") or "",
+            "코트": m.get("court") or "",
+            "팀1": t1,
+            "팀1 점수": m.get("team1_score"),
+            "팀2 점수": m.get("team2_score"),
+            "팀2": t2,
+        })
+    export_df = pd.DataFrame(export_rows)
+    export_buffer = io.BytesIO()
+    with pd.ExcelWriter(export_buffer, engine="openpyxl") as writer:
+        export_df.to_excel(writer, index=False, sheet_name="대진표")
+    export_buffer.seek(0)
+    st.download_button(
+        "대진표 엑셀 다운로드",
+        data=export_buffer,
+        file_name=f"{selected_name}_대진표.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 if matches:
     # 라운드별로 그룹핑
