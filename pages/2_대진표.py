@@ -6,7 +6,7 @@
 """
 import streamlit as st
 import db
-from logic.schedule import generate_schedule, infer_match_type
+from logic.schedule import generate_schedule, infer_match_type, recommend_matches_per_person
 
 st.title("대진표")
 
@@ -101,9 +101,15 @@ if not is_locked:
             with col_c:
                 court_count = st.slider("코트 수", min_value=1, max_value=4, value=2, key="gen_courts")
             with col_d:
-                matches_per_person = st.number_input(
-                    "인당 경기 수", min_value=1, max_value=20, value=3, step=1, key="gen_mpp",
+                repeat_count = st.number_input(
+                    "반복 수", min_value=1, max_value=10, value=1, step=1, key="gen_repeat",
                 )
+
+            recommended_mpp = recommend_matches_per_person(n, match_type)
+            st.caption(
+                f"1회전 기준 추천 인당 경기 수: {recommended_mpp} | "
+                f"현재 설정 예상 인당 경기 수: {recommended_mpp * int(repeat_count)}"
+            )
 
             players_per_match = 4 if match_type == "복식" else 2
 
@@ -127,13 +133,13 @@ if not is_locked:
                     )
 
                 sitting_per_round = n - actual_active
-                est_rounds = math.ceil((n * int(matches_per_person)) / actual_active)
+                est_rounds = math.ceil((n * (recommended_mpp * int(repeat_count))) / actual_active)
                 st.info(
                     f"선수 **{n}명** · 코트 **{actual_courts}개** "
                     f"({', '.join(actual_court_labels)}) · {match_type}  \n"
                     f"라운드당 **{actual_active}명** 활동"
                     + (f" / **{sitting_per_round}명** 휴식" if sitting_per_round > 0 else " (전원 참가)")
-                    + f" · 예상 **{est_rounds}라운드**"
+                    + f" · 반복 **{int(repeat_count)}회** · 예상 **{est_rounds}라운드**"
                 )
 
                 # 기존 경기 여부 안내
@@ -153,7 +159,7 @@ if not is_locked:
                         players,
                         courts=actual_court_labels,   # 실제 사용 코트 목록 사용
                         match_type=match_type,
-                        matches_per_person=int(matches_per_person),
+                        repeat_count=int(repeat_count),
                         randomize=randomize,
                     )
 
