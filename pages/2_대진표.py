@@ -8,7 +8,18 @@ import streamlit as st
 import io
 import pandas as pd
 import db
-from logic.schedule import generate_schedule, infer_match_type, recommend_matches_per_person
+from logic.schedule import generate_schedule, infer_match_type
+
+
+def _recommended_matches_per_person(player_count: int, match_type: str) -> int:
+    """대진표 페이지 표시용 추천 경기 수."""
+    if player_count <= 0:
+        return 0
+    if match_type == "복식" and player_count < 4:
+        return 0
+    if match_type == "단식" and player_count < 2:
+        return 0
+    return max(1, player_count - 1)
 
 st.title("대진표")
 
@@ -132,7 +143,7 @@ if not is_locked:
                     "반복 수", min_value=1, max_value=10, value=1, step=1, key="gen_repeat",
                 )
 
-            recommended_mpp = recommend_matches_per_person(n, match_type)
+            recommended_mpp = _recommended_matches_per_person(n, match_type)
             st.caption(
                 f"1회전 기준 추천 인당 경기 수: {recommended_mpp} | "
                 f"현재 설정 예상 인당 경기 수: {recommended_mpp * int(repeat_count)}"
